@@ -28,6 +28,58 @@ int CommandProcessor(std::string command)
 		ExitProcess(EXIT_SUCCESS);
 		return true;
 	}
+
+	// /connect [host[:port]] [port] - connects to a server (the address is
+	// remembered in config.xml); without arguments to the remembered one.
+	if (!command.compare("/connect"))
+	{
+		std::string host = CGlobals::Get().serverIP;
+		int port = CGlobals::Get().serverPort;
+		std::vector<std::string> args;
+		for (auto & p : params)
+			if (!p.empty())
+				args.push_back(p);
+		if (args.size() >= 1)
+		{
+			host = args[0];
+			size_t colon = host.rfind(':');
+			if (colon != std::string::npos)
+			{
+				port = std::atoi(host.substr(colon + 1).c_str());
+				host = host.substr(0, colon);
+			}
+		}
+		if (args.size() >= 2)
+			port = std::atoi(args[1].c_str());
+		if (host.empty() || host.size() >= sizeof(CGlobals::Get().serverIP) || port < 1 || port > 65535)
+		{
+			CChat::Get()->AddChatMessage("USAGE: /connect [host[:port]] [port]   (remembered: " + std::string(CGlobals::Get().serverIP) + ":" + std::to_string(CGlobals::Get().serverPort) + ")", 0xAAAAAAFF);
+			return true;
+		}
+		strncpy_s(CGlobals::Get().serverIP, sizeof(CGlobals::Get().serverIP), host.c_str(), _TRUNCATE);
+		CGlobals::Get().serverPort = port;
+		CConfig::Get()->sNickName = std::string(CGlobals::Get().nickName);
+		CConfig::Get()->sIP = host;
+		CConfig::Get()->uiPort = (unsigned int)port;
+		CConfig::Get()->Save();
+		CGlobals::Get().displayServerBrowser = false;
+		CGlobals::Get().showChat = true;
+		CScriptInvoker::Get().Push([=]() {
+			CNetworkConnection::Get()->ConnectTo(host, (unsigned short)port);
+		});
+		return true;
+	}
+	if (!command.compare("/disconnect"))
+	{
+		CScriptInvoker::Get().Push([]() {
+			if (CNetworkConnection::Get()->IsConnected())
+				CNetworkConnection::Get()->Disconnect();
+			else
+				CChat::Get()->AddChatMessage("Not connected to any server");
+			CGlobals::Get().displayServerBrowser = true;
+		});
+		return true;
+	}
 	
 	if (!command.compare("/save") && CGlobals::Get().isDebug)
 	{

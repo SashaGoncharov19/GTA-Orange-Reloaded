@@ -20,12 +20,10 @@ void Action()
 	{
 		if (!teleported)
 		{
-			//StartScript("mp_registration");
-			//StartScript("title_update_registration");
-			SCRIPT::_REQUEST_STREAMED_SCRIPT(Utils::Hash("standard_global_init"));
-			//StartScript("standard_global_init");
-			//StartScript("standard_global_reg");
-
+			// 2017 requested the "standard_global_init" script here without
+			// ever starting it (the StartScript calls next to it were commented
+			// out). On 1.0.3889.0 that request throws inside the game's native
+			// and nothing depends on it, so it is gone.
 			scriptWait(0);
 
 			ENTITY::SET_ENTITY_COORDS(PLAYER::PLAYER_PED_ID(), 363.871f, 621.555f, 78.44f, true, false, false, false);
@@ -39,7 +37,6 @@ void Action()
 			CLocalPlayer::Get()->ChangeModel(Utils::Hash("mp_m_freemode_01"));
 			CGlobals::Get().displayServerBrowser = true;
 			teleported = true;
-			CLocalPlayer::Get()->ChangeModel(Utils::Hash("mp_m_freemode_01"));
 			std::stringstream ss;
 			ss << "{E30022}" << u8"\ueffb" << "{FFFFFF} Grand Theft Auto: {FF8F00}Orange {FFFFFF}loaded";
 			CChat::Get()->AddChatMessage(ss.str());

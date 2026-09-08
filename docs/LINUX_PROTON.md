@@ -65,6 +65,35 @@ The script compares `version.txt` of the package with the launcher version in
 `launcher.log` and warns when the binaries next to it are not the ones from
 the package.
 
+### The flow that works (GTA V 1.0.3889.0, verified 2026-09-08)
+
+1. Start the server (section 1) in its own terminal: `./orange_server`.
+2. Start GTA V through Steam as usual and load into story mode.
+3. From the client folder:
+
+   ```bash
+   ./gta-orange-proton.sh --no-launch -- --inject-after 5
+   ```
+
+   The launcher injects `orange-core.dll` into the running game; a few
+   seconds later the chat says "Grand Theft Auto: Orange loaded", the player
+   becomes a freemode ped and the server browser opens.
+4. In the browser: nickname, address `127.0.0.1` port `7788`, **Connect**.
+   The chat reports `Connecting to ...`, then `Connected to ...` and the
+   server's welcome, or `Not connected: ... did not answer` when nothing
+   listens there (then the browser comes back; `F12` also reopens it, and
+   `/connect host:port` in the chat (`T`) does the same as the button).
+5. `./gta-orange-proton.sh --logs` explains the run afterwards, including
+   the connection.
+
+Delete an `orange.storymode` file next to `orange-core.dll` if one is left
+from earlier experiments: with it the single player scripts keep running
+(HUD, missions, story) next to GTA:Orange.
+
+Starting the game through the script (without `--no-launch`) waits for the
+game window plus 45 seconds before injecting, then continues the same way;
+report a run of that path too, it has been exercised less.
+
 The script
 
 1. locates Steam, the game's Proton prefix and the Proton version Steam uses

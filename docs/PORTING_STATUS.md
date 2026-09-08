@@ -53,6 +53,17 @@ Everything is written down in `docs/FINDINGS_1.0.3889.0.md`. In short:
 
 ## 3. What happens on 1.0.3889.0 now
 
+**Confirmed live on 2026-09-08** (Steam, Linux + Proton, injected into a
+running story-mode game with `./gta-orange-proton.sh --no-launch --
+--inject-after 5`): every required offset resolves by pattern, the hooks
+install, the game accepts and ticks the script thread, 6441 translations and
+6701 registered natives, natives execute, rendering and input work on the
+game's 1920x1080 swap chain, and the client scripts run: the player is
+teleported to the lobby camera scene, becomes `mp_m_freemode_01`, the chat
+and the server browser appear. Connecting to a server is the next step
+(the 2017 lobby has no server list; the address is typed in the browser or
+with `/connect`, section 4).
+
 `client.log` should read like this on a good run (abridged):
 
 ```
@@ -113,14 +124,22 @@ Tick and script id hooks pass everything through).
    the thread object was verified (see the findings document, section 3).
    Public references for current layouts: FiveM's headers, the
    `gtav-classes` repository, SP mod menus.
-2. **The first live run.** Everything above is static analysis. Run the
-   nightly, read `client.log`, and report the first line that deviates from
-   section 3. `offsets.ini` can still override or disable any entry
-   (`ForceToSingle = disabled` etc.) if a patch misbehaves.
-3. **Loading screen and player setup** on 3889 are done by the client
-   scripts (`Scripts/GameInit.cpp` and the Lua resources), since the stock
-   scripts no longer run; check that the fade-in and the freemode ped
-   creation work with the translated natives.
+2. **The first live run: done** (section 3). What it showed: the 2017
+   request for the `standard_global_init` script threw inside the game's
+   native (removed, nothing used it); the lobby is the 2017 one (teleport to
+   a camera scene over Vinewood, freemode ped, server browser) and looks
+   whatever the story-mode time of day makes it look; the server browser
+   pointed at a hardcoded "beta-test server" (now: the address is typed in
+   the browser or with `/connect host:port`, remembered in `config.xml`,
+   and every connection step is logged as `Network: ...`).
+3. **The first connected session.** Run `orange_server` (Linux build) next
+   to the game and connect to `127.0.0.1:7788`. Expected on 3889: the
+   server accepts the player and the `example` resource teleports it to its
+   spawn, creates vehicles, a blip and a marker; remote players appear as
+   peds but move by teleport-interpolation only (`CNetworkPlayer::AssignTask`
+   is refused off the reference build); the local player's on-foot data is
+   read through natives where the 2017 structure reads were replaced, and
+   the remaining structure reads (aim, tasks) are wrong until item 1 is done.
 4. `ReplayInterfaces`, `ViewportGame` and the gameplay patches
    (`GameProcessHooks`) have no patterns; only the debug pool overlay and the
    cosmetic patches depend on them.

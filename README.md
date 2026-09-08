@@ -73,10 +73,11 @@ Server events, commands and the whole API exposed to Lua are listed in
   game's Proton prefix. Details, requirements and troubleshooting:
   [docs/LINUX_PROTON.md](docs/LINUX_PROTON.md).
 
-The client connects to the server address configured in
-`orange-core.dll` (default `127.0.0.1:7788`); an empty `orange.developer` file
-next to the DLL enables the direct-connect fields in the in-game server
-browser.
+Once the game is running with the client, the in-game server browser asks
+for a nickname and a server address (default `127.0.0.1:7788`, the server on
+the same machine). The address is remembered in `config.xml` next to
+`orange-core.dll`. `F12` shows the browser again; the chat (`T`) accepts
+`/connect host:port` and `/disconnect`.
 
 ### Automatic updates
 

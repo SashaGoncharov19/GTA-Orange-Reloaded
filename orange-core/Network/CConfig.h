@@ -1,4 +1,9 @@
 #pragma once
+// config.xml next to orange-core.dll:
+//   <config>
+//     <server port="7788">127.0.0.1</server>
+//     <player>Nickname</player>
+//   </config>
 class CConfig
 {
 	static CConfig *singleInstance;
@@ -14,10 +19,11 @@ public:
 
 	tinyxml2::XMLDocument doc;
 	std::string sNickName = "Player";
-	std::string sIP = "";
-	unsigned int uiPort;
+	std::string sIP = "127.0.0.1";
+	unsigned int uiPort = 7788;
 
-	void Save();
+	// Writes config.xml; a failure is logged, never thrown (callers run on
+	// the render thread).
+	bool Save();
 	~CConfig();
 };
-
