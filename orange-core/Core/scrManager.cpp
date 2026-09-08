@@ -47,8 +47,31 @@ void Script::Yield(uint32_t time)
 	SwitchToFiber(mainFiber);
 }
 
+// The game has booted once its own scripts took the loading screen down and
+// the player is in the world. Read through natives from the script thread,
+// which is the one place they are meant to be called from.
+static bool GameHasBooted()
+{
+	static unsigned ticks = 0;
+	++ticks;
+	bool loading = DLC2::GET_IS_LOADING_SCREEN_ACTIVE() != 0;
+	bool playing = PLAYER::IS_PLAYER_PLAYING(PLAYER::PLAYER_ID()) != 0;
+	if (!loading && playing)
+		return true;
+	if (ticks == 1 || ticks % 900 == 0)
+		log_info << "Script thread: waiting for the game to boot (loading screen " << (loading ? "active" : "gone")
+			<< ", player " << (playing ? "playing" : "not playing yet") << ", tick " << ticks << ")" << std::endl;
+	return false;
+}
+
 void ScriptManagerThread::DoRun()
 {
+	if (!ScriptEngine::TookOver())
+	{
+		if (!GameHasBooted())
+			return;
+		ScriptEngine::TakeOver();
+	}
 	for (auto & pair : m_scripts)
 		pair.second->Tick();
 }

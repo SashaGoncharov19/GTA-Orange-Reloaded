@@ -130,7 +130,20 @@ bool Injector::InjectAll(bool waitForUnpack, int unpackTimeoutSeconds)
 			continue;
 		}
 		LauncherLog("inject: loading " + lib);
-		if (!Inject(pid, lib, error))
+		bool loaded = false;
+		for (int attempt = 1; attempt <= 3 && !loaded; ++attempt)
+		{
+			loaded = Inject(pid, lib, error);
+			if (loaded)
+				break;
+			// A process that is gone will not come back; one that is alive
+			// may have refused a transient state (unpack still running).
+			if (error.find("is exiting or already gone") != std::string::npos || attempt == 3)
+				break;
+			LauncherLog("inject: attempt " + std::to_string(attempt) + " failed: " + error + "; retrying in 2s");
+			Sleep(2000);
+		}
+		if (!loaded)
 		{
 			LauncherLog("inject: FAILED: " + error);
 			std::string message = "Failed to inject " + lib + "\n" + error + "\n\nSee launcher.log and client.log next to Launcher.exe.";
@@ -197,6 +210,48 @@ bool Injector::WaitUntilGameStarts(int timeoutSeconds)
 	return true;
 }
 
+// The Social Club SDK inside the game initialises during the first seconds
+// after GTA5.exe starts and answers "failed to initialize, error code 1005"
+// when that goes wrong. An outside process holding a full-access handle and
+// reading the game's memory at exactly that time (the unpack wait) is the
+// kind of thing it objects to, while an injection into a game that has been
+// running for a while is not. So by default the launcher does not touch the
+// process at all until the game window exists and a further delay has passed.
+bool Injector::WaitForGameWindow(int delaySeconds, int timeoutSeconds)
+{
+	ULONGLONG started = GetTickCount64();
+	ULONGLONG deadline = started + (ULONGLONG)timeoutSeconds * 1000ULL;
+	HWND window = NULL;
+	while ((window = FindWindowW(L"grcWindow", NULL)) == NULL)
+	{
+		if (FindProcess(PROCESS_NAME) == -1)
+		{
+			LauncherLog("wait for window: GTA5.exe exited before creating its window (the game itself failed to start; nothing was injected)");
+			return false;
+		}
+		if (GetTickCount64() > deadline)
+		{
+			LauncherLog("wait for window: no game window (class grcWindow) within " + std::to_string(timeoutSeconds) + "s, injecting anyway");
+			return true;
+		}
+		Sleep(500);
+	}
+	LauncherLog("wait for window: game window found after " + std::to_string((GetTickCount64() - started) / 1000) + "s, waiting "
+		+ std::to_string(delaySeconds) + "s more so the game finishes its own start-up (Social Club) before it is touched");
+	for (int waited = 0; waited < delaySeconds; ++waited)
+	{
+		Sleep(1000);
+		if (FindProcess(PROCESS_NAME) == -1)
+		{
+			LauncherLog("wait for window: GTA5.exe exited during the delay (the game itself failed to start; nothing was injected)");
+			return false;
+		}
+		if ((waited + 1) % 15 == 0 && waited + 1 < delaySeconds)
+			LauncherLog("wait for window: " + std::to_string(waited + 1) + "s of " + std::to_string(delaySeconds) + "s");
+	}
+	return true;
+}
+
 bool Injector::Inject(int processId, std::string dllName, std::string& error)
 {
 	HANDLE process = OpenProcess(PROCESS_ALL_ACCESS, false, processId);
@@ -208,12 +263,27 @@ bool Injector::Inject(int processId, std::string dllName, std::string& error)
 			error += ": access denied - the game runs in another Proton prefix / as another user, or an anti-cheat protects it";
 		return false;
 	}
+	// "Access denied" from the calls below usually does not mean a permission
+	// problem: it is what a process that is already exiting answers. Telling
+	// the two apart decides whether a retry makes sense.
+	auto describeProcess = [&](DWORD code) -> std::string
+	{
+		DWORD exitCode = STILL_ACTIVE;
+		bool alive = GetExitCodeProcess(process, &exitCode) && exitCode == STILL_ACTIVE
+			&& WaitForSingleObject(process, 0) == WAIT_TIMEOUT;
+		if (!alive)
+			return " - GTA5.exe is exiting or already gone (exit code " + std::to_string(exitCode) + "), it did not fail because of the injection";
+		if (code == ERROR_ACCESS_DENIED)
+			return " - the process is still running; access denied on a live process means an anti-cheat / protection refused it";
+		return "";
+	};
 	LPVOID LoadLibraryA_ = (LPVOID)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "LoadLibraryA");
 	size_t size = dllName.length() + 1;
 	LPVOID LoadComp = VirtualAllocEx(process, NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (!LoadComp)
 	{
-		error = "VirtualAllocEx failed (error " + std::to_string(GetLastError()) + ")";
+		DWORD code = GetLastError();
+		error = "VirtualAllocEx failed (error " + std::to_string(code) + ")" + describeProcess(code);
 		CloseHandle(process);
 		return false;
 	}
@@ -221,7 +291,8 @@ bool Injector::Inject(int processId, std::string dllName, std::string& error)
 	HANDLE injectThread = CreateRemoteThread(process, NULL, 0, (LPTHREAD_START_ROUTINE)LoadLibraryA_, LoadComp, 0, NULL);
 	if (!injectThread)
 	{
-		error = "CreateRemoteThread failed (error " + std::to_string(GetLastError()) + ")";
+		DWORD code = GetLastError();
+		error = "CreateRemoteThread failed (error " + std::to_string(code) + ")" + describeProcess(code);
 		VirtualFreeEx(process, LoadComp, 0, MEM_RELEASE);
 		CloseHandle(process);
 		return false;

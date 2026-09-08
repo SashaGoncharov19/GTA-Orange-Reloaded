@@ -496,11 +496,11 @@ static void OnGameFrame()
 		}
 	}
 
-	// Reference build route: stop the single player scripts by name once they
-	// start, then leave the loading screen. On builds without those functions
-	// the stock scripts never tick (ScriptEngine::InstallHooks) and the script
-	// thread leaves the loading screen through natives.
-	if (g_gameReady && !IsScriptsDisabled() && CanDisableScriptsByName() && IsAnyScriptLoaded())
+	// Reference build route: once GTA:Orange has taken over (the game booted
+	// with its own scripts), terminate the single player scripts by name so
+	// they release what they hold; frozen threads alone would keep it. On
+	// builds without those functions the freeze is all there is.
+	if (g_gameReady && ScriptEngine::TookOver() && !IsScriptsDisabled() && CanDisableScriptsByName() && IsAnyScriptLoaded())
 	{
 		DisableScripts();
 		if (CGlobals::Get().ShutdownLoadingScreen)

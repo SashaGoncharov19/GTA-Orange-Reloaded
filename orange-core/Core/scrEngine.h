@@ -36,8 +36,17 @@ public:
 	// Writes the script name (and, on 1.0.2699+, its hash) into the thread object.
 	static void SetThreadName(ScriptThread * thread, const char * name);
 	static bool IsOwnedThread(scrThread * thread);
-	// True when the stock single player scripts may run (orange.storymode).
+	// True while the stock single player scripts may run: always with
+	// orange.storymode, otherwise until TakeOver().
 	static bool StockScriptsAllowed();
+	// The game boots with its own scripts (startup -> main): they load the
+	// world, put the player into it and take the loading screen down. Freezing
+	// them earlier leaves the game waiting for its startup script until it
+	// gives up ("failed to initialize"). TakeOver() is called from the script
+	// thread once the game has booted: from then on the stock scripts are
+	// frozen and the client scripts run.
+	static void TakeOver();
+	static bool TookOver();
 	// True once the game has allocated its script thread collection.
 	static bool ThreadCollectionReady();
 	// MinHook hooks on the script engine (thread tick, script id comparison).

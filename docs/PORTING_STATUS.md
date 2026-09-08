@@ -18,8 +18,9 @@ how offsets are resolved is in `docs/UPDATING_OFFSETS.md`.
 | Proton | `tools/proton/gta-orange-proton.sh`: finds Steam, the game's prefix and Proton, starts the game, runs `Launcher.exe --inject` inside the prefix, shows both logs afterwards and says whether orange-core activated. |
 | Diagnostics | `launcher.log` records every launcher step (update, game folder, pid, unpack wait, natives crossmap, injection result, anti-cheat module warning). `client.log` records everything orange-core does inside the game: offset resolution, every hook, the script thread, the natives translation. |
 | Game offsets | One table (`orange-core/GameOffsets.cpp`, 92 entries) with a name, the reference RVA (January 2017 build), byte pattern candidates and a required/optional flag per entry. Resolution order: `offsets.ini [version]` → `[default]` → reference RVA (reference build only) → pattern scan → unresolved. **Only 9 entries are required** (the script engine globals and functions), all of them found by pattern on 1.0.3889.0; everything else is optional and has a fallback. |
-| Hooks | The FiveM approach (`rage-scripting-five`), with MinHook: the game's "start the startup script" function triggers GTA:Orange's initialisation, `GtaThread::Tick` only runs GTA:Orange's threads (the single player scripts stay frozen), the script id comparison answers "same script", the window message pump is the per-frame hook. Present is hooked through the vtable of a temporary swap chain, the game window comes from the swap chain. The reference build's call-site patches (code cave) remain as fallbacks. |
+| Hooks | The FiveM approach (`rage-scripting-five`), with MinHook: the game's "start the startup script" function triggers GTA:Orange's initialisation, `GtaThread::Tick` lets the game boot with its own scripts and, once the player is in the world, runs only GTA:Orange's threads (the single player scripts are frozen from then on), the script id comparison answers "same script", the window message pump is the per-frame hook. Present is hooked through the vtable of a temporary swap chain, the game window comes from the swap chain. The reference build's call-site patches (code cave) remain as fallbacks. |
 | Script thread | The thread object is allocated with a large zeroed tail and reads the script handler position from the game's own Kill code (`+0x110` on the reference build, `+0x118` since 1.0.2699), vtable slot 5 is reserved for `CacheThreadData` (1.0.3570+). |
+| Start-up timing | The game's Social Club SDK answers "failed to initialize, error code 1005" when something touches `GTA5.exe` during its first seconds (seen with the unpack-detection memory reads alone, no DLL loaded). The launcher therefore injects only after the game window has existed for 45 s (`--inject-after`), the way the one working session was injected by accident. `orange-core` then lets the game boot with its own scripts and takes over once the player is in the world (`ScriptEngine::TakeOver`), so the `startup` script the game waits for does run. |
 | Natives | `Natives.h` calls natives by canonical hash; `Core/NativeTable.cpp` translates through `natives-<version>.txt` and walks the obfuscated registration table (1.0.1290+). **`natives-<version>.txt` is generated automatically** from FiveM's public `CrossMapping_Universal.h`: by `gta-orange-proton.sh` before injecting (Linux side, reads the version out of `GTA5.exe`) and by `Launcher.exe` from inside the prefix. The launcher falls back to reading the game version from the running process, because under Proton the game's own path is a drive mapping it usually cannot open. |
 | Game dump | `Launcher.exe --dump-game` (or `./gta-orange-proton.sh --dump-game`) writes the unpacked in-memory `GTA5.exe` to `GTA5-<version>.dump.exe`, section table fixed so file offsets equal RVAs. |
 
@@ -64,7 +65,7 @@ Everything is written down in `docs/FINDINGS_1.0.3889.0.md`. In short:
 [Info] Hook LookAlive: installed at 0x...
 [Info] Hook StartupScript: installed at 0x...
 [Info] Hook ScriptThreadTick: installed at 0x...
-[Info] Script hooks: stock scripts frozen, only GTA:Orange threads run
+[Info] Script hooks: the stock scripts run until the game has booted, then only GTA:Orange threads run
 [Info] Natives: 6430 translation(s) from ...\natives-1.0.3889.0.txt
 [Info] StartupScript hook: the game is about to start its startup script
 [Info] Game ready: initialising GTA:Orange
@@ -84,7 +85,7 @@ The flow:
    `GameProcessHooks` patches have no pattern and are skipped) and redirects
    the `CreateWindowExW` call site (window title and icon).
 2. A worker thread installs the MinHook hooks: message pump (per frame),
-   startup script (game ready), thread tick (stock scripts frozen), script
+   startup script (game ready), thread tick (stock scripts frozen after boot), script
    id comparison.
 3. When the game starts its `startup` script, GTA:Orange initialises the
    script engine, hooks Present, subclasses the window, creates its script

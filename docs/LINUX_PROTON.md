@@ -88,6 +88,25 @@ protontricks-launch --appid 271590 ./Launcher.exe --inject   # alternative
 `Launcher.exe --help` lists all launcher options (`--inject`, `--game-dir`,
 `--timeout`, `--no-unpack-wait`, ...).
 
+### "Failed to initialize. Error code 1005"
+
+That message comes from the game's Social Club SDK, which initialises during
+the first seconds after `GTA5.exe` starts and reports 1005 when it cannot
+complete ([Rockstar Support](https://support.rockstargames.com/articles/mYBXIDmxRAvgk1rQwoGI2/rockstar-games-error-code-1005)).
+It appeared on every fresh start while the launcher watched the game process
+from its first second (a full-access handle plus memory reads for the unpack
+detection), including a run where the injection itself failed and no DLL was
+ever loaded, and never when the game had been running for a while before the
+launcher touched it.
+
+So the launcher now leaves the process alone until the game window exists and
+a further 45 seconds have passed (`--inject-after SEC`, `0` restores the old
+"right after unpack" behaviour). `launcher.log` shows `wait for window: ...`
+lines during that time. If 1005 still appears with the launcher not running at
+all (start the game through Steam alone to check), it is between the game and
+Rockstar's servers: verify the game files in Steam, quit Steam completely and
+start it again, and make sure nothing blocks the Rockstar Games Launcher.
+
 ### Automatic updates under Proton
 
 `Launcher.exe` checks the GitHub releases for a newer client before every

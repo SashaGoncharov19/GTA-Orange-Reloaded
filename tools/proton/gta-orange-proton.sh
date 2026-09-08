@@ -26,6 +26,11 @@
 #   --timeout SEC      how long to wait for GTA5.exe (default 600)
 #   --logs             only print the log files of the last run and exit
 #   --no-log-tail      do not print the logs after the launcher exits
+#   --inject-after SEC passed to Launcher.exe: wait for the game window and
+#                      SEC more seconds before injecting (default 45). The
+#                      game's Social Club SDK initialises during its first
+#                      seconds and reports "error code 1005" when disturbed;
+#                      0 injects right after the executable is unpacked.
 #   --dump-game        passed to Launcher.exe: write the unpacked GTA5.exe
 #                      image (for IDA / Ghidra) next to this script, no inject
 #   -h, --help         show this help
