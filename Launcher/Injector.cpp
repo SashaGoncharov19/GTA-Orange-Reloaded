@@ -205,42 +205,48 @@ bool Injector::Inject(int processId, std::string dllName, std::string& error)
 
 // File offset of an RVA inside the executable on disk, 0 when it cannot be
 // determined (used to compare the code section on disk with memory).
-static uint64_t RvaToFileOffset(const std::wstring& exePath, uint32_t rva)
+// Reads `size` bytes at `offset` of a file that is in use by a running
+// process (the game keeps its own executable open), hence the share flags.
+static bool ReadFileAt(const std::wstring& path, uint64_t offset, void* out, DWORD size, DWORD* errorOut = NULL)
 {
-	std::ifstream in(exePath, std::ios::binary);
-	if (!in)
-		return 0;
+	HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+		NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (file == INVALID_HANDLE_VALUE)
+	{
+		if (errorOut) *errorOut = GetLastError();
+		return false;
+	}
+	LARGE_INTEGER position;
+	position.QuadPart = (LONGLONG)offset;
+	DWORD read = 0;
+	bool ok = SetFilePointerEx(file, position, NULL, FILE_BEGIN) && ReadFile(file, out, size, &read, NULL) && read == size;
+	if (!ok && errorOut)
+		*errorOut = GetLastError();
+	CloseHandle(file);
+	return ok;
+}
+
+// File offset of an RVA inside the executable on disk, 0 when it cannot be
+// determined (used to compare the code section on disk with memory).
+static uint64_t RvaToFileOffset(const std::wstring& exePath, uint32_t rva, DWORD* errorOut = NULL)
+{
 	IMAGE_DOS_HEADER dos;
-	in.read((char*)&dos, sizeof(dos));
-	if (!in || dos.e_magic != IMAGE_DOS_SIGNATURE)
+	if (!ReadFileAt(exePath, 0, &dos, sizeof(dos), errorOut) || dos.e_magic != IMAGE_DOS_SIGNATURE)
 		return 0;
-	in.seekg(dos.e_lfanew);
 	IMAGE_NT_HEADERS64 nt;
-	in.read((char*)&nt, sizeof(nt));
-	if (!in || nt.Signature != IMAGE_NT_SIGNATURE)
+	if (!ReadFileAt(exePath, (uint64_t)dos.e_lfanew, &nt, sizeof(nt), errorOut) || nt.Signature != IMAGE_NT_SIGNATURE)
 		return 0;
-	in.seekg((std::streamoff)dos.e_lfanew + FIELD_OFFSET(IMAGE_NT_HEADERS64, OptionalHeader) + nt.FileHeader.SizeOfOptionalHeader);
+	uint64_t sections = (uint64_t)dos.e_lfanew + FIELD_OFFSET(IMAGE_NT_HEADERS64, OptionalHeader) + nt.FileHeader.SizeOfOptionalHeader;
 	for (int i = 0; i < nt.FileHeader.NumberOfSections; ++i)
 	{
 		IMAGE_SECTION_HEADER section;
-		in.read((char*)&section, sizeof(section));
-		if (!in)
+		if (!ReadFileAt(exePath, sections + (uint64_t)i * sizeof(section), &section, sizeof(section), errorOut))
 			return 0;
 		uint32_t size = section.Misc.VirtualSize > section.SizeOfRawData ? section.Misc.VirtualSize : section.SizeOfRawData;
 		if (rva >= section.VirtualAddress && rva < section.VirtualAddress + size)
 			return (uint64_t)section.PointerToRawData + (rva - section.VirtualAddress);
 	}
 	return 0;
-}
-
-static bool ReadFileBytes(const std::wstring& path, uint64_t offset, unsigned char* out, size_t size)
-{
-	std::ifstream in(path, std::ios::binary);
-	if (!in)
-		return false;
-	in.seekg((std::streamoff)offset);
-	in.read((char*)out, (std::streamsize)size);
-	return (size_t)in.gcount() == size;
 }
 
 // The retail executable is packed; wait until its code section has been
@@ -308,8 +314,9 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 	}
 
 	unsigned char disk[10] = { 0 };
-	uint64_t fileOffset = exePath.empty() ? 0 : RvaToFileOffset(exePath, 0x1000);
-	if (fileOffset && ReadFileBytes(exePath, fileOffset, disk, sizeof(disk)))
+	DWORD diskError = 0;
+	uint64_t fileOffset = exePath.empty() ? 0 : RvaToFileOffset(exePath, 0x1000, &diskError);
+	if (fileOffset && ReadFileAt(exePath, fileOffset, disk, sizeof(disk), &diskError))
 	{
 		if (memcmp(buff, disk, sizeof(disk)) != 0)
 		{
@@ -320,7 +327,8 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 		LauncherLog("unpack wait: code section still equals the file on disk, waiting for it to change");
 	}
 	else
-		LauncherLog("unpack wait: cannot compare with the file on disk, waiting for the code section to change in memory");
+		LauncherLog("unpack wait: cannot compare with the file on disk (error " + std::to_string(diskError)
+			+ "), waiting for the code section to change in memory");
 
 	for (;;)
 	{

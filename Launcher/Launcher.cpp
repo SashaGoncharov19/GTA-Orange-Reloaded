@@ -433,7 +433,10 @@ void LaunchGame()
 		if (!Injector::Get().WaitUntilGameStarts(g_options.timeoutSeconds))
 			Fail(L"Timed out waiting for GTA5.exe to start");
 		SetSplashStatus(L"Injecting orange-core.dll...");
-		if (!Injector::Get().InjectAll(g_options.waitForUnpack && !isPirate))
+		// A game we attach to (--inject) has been running for a while and is
+		// unpacked long ago; keep the wait short there, the full 2 minutes
+		// only make sense for a process the launcher just started itself.
+		if (!Injector::Get().InjectAll(g_options.waitForUnpack && !isPirate, g_options.injectOnly ? 20 : 120))
 		{
 			LauncherLog("injection FAILED, see above; the game keeps running without GTA:Orange");
 			TerminateProcess(GetCurrentProcess(), 1);

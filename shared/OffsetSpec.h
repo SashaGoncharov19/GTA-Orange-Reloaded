@@ -234,13 +234,76 @@ struct BytePattern
 	}
 };
 
+inline bool ParseIntegerText(const std::string& text, long long& out)
+{
+	std::string t = TrimCopy(text);
+	if (t.empty()) return false;
+	char* end = NULL;
+	long long v = std::strtoll(t.c_str(), &end, 0);
+	if (end == t.c_str() || *end != '\0') return false;
+	out = v;
+	return true;
+}
+
+// One byte pattern plus the delta added to its match.
+struct PatternCandidate
+{
+	BytePattern pattern;
+	int delta;
+};
+
+// "48 8B ? ? @ 7 | 4C 8D 0D ? ? ? ? @ 3 | E8 ? ? ? ?": candidates tried in
+// order until one matches exactly once (game builds move code around, so
+// several variants of the same instruction sequence are common). A candidate
+// without "@ delta" gets `defaultDelta`. Returns false on any malformed part.
+inline bool ParsePatternCandidates(const std::string& text, int defaultDelta, std::vector<PatternCandidate>& out, std::string* error = NULL)
+{
+	out.clear();
+	size_t start = 0;
+	while (start <= text.size())
+	{
+		size_t bar = text.find('|', start);
+		std::string part = TrimCopy(text.substr(start, bar == std::string::npos ? std::string::npos : bar - start));
+		start = (bar == std::string::npos) ? text.size() + 1 : bar + 1;
+		if (part.empty())
+		{
+			if (error) *error = "empty pattern in '" + text + "'";
+			return false;
+		}
+		PatternCandidate candidate;
+		candidate.delta = defaultDelta;
+		std::string patternText = part;
+		size_t at = part.find('@');
+		if (at != std::string::npos)
+		{
+			long long d = 0;
+			if (!ParseIntegerText(part.substr(at + 1), d))
+			{
+				if (error) *error = "bad delta after '@' in '" + part + "'";
+				return false;
+			}
+			candidate.delta = (int)d;
+			patternText = part.substr(0, at);
+		}
+		if (!candidate.pattern.Parse(patternText))
+		{
+			if (error) *error = "not a byte pattern: '" + TrimCopy(patternText) + "'";
+			return false;
+		}
+		out.push_back(candidate);
+	}
+	return !out.empty();
+}
+
 // ---------------------------------------------------------------------------
 // OffsetSpec: one "Name = value" line of offsets.ini
 //
 //   Name = 0x1F26D4                RVA relative to the GTA5.exe base
 //   Name = disabled                skip this hook / patch (also: off, none, -)
-//   Name = scan                    use the pattern built into orange-core
+//   Name = scan                    use the pattern(s) built into orange-core
 //   Name = 48 8B ? ? E8 @ -7       scan for this pattern, add -7 to the match
+//   Name = 48 8B ? ? @ 7 | 4C 8D ? ? @ 3   several candidates, first unique
+//                                  match wins
 // ---------------------------------------------------------------------------
 struct OffsetSpec
 {
@@ -248,25 +311,20 @@ struct OffsetSpec
 
 	Kind kind;
 	uint64_t rva;
-	BytePattern pattern;
-	int delta;
+	BytePattern pattern;                      // first candidate (kept for convenience)
+	int delta;                                // delta of the first candidate
+	std::vector<PatternCandidate> candidates; // all candidates, in order
 
 	OffsetSpec() : kind(Rva), rva(0), delta(0) {}
 
 	static bool ParseInteger(const std::string& text, long long& out)
 	{
-		std::string t = TrimCopy(text);
-		if (t.empty()) return false;
-		char* end = NULL;
-		long long v = std::strtoll(t.c_str(), &end, 0);
-		if (end == t.c_str() || *end != '\0') return false;
-		out = v;
-		return true;
+		return ParseIntegerText(text, out);
 	}
 
 	bool Parse(const std::string& rawValue, std::string* error = NULL)
 	{
-		kind = Rva; rva = 0; delta = 0; pattern = BytePattern();
+		kind = Rva; rva = 0; delta = 0; pattern = BytePattern(); candidates.clear();
 		std::string value = TrimCopy(rawValue);
 		std::string lower = LowerCopy(value);
 		if (value.empty())
@@ -296,26 +354,15 @@ struct OffsetSpec
 			rva = (uint64_t)v;
 			return true;
 		}
-		// Pattern, optionally followed by "@ delta".
-		std::string patternText = value;
-		size_t at = value.find('@');
-		if (at != std::string::npos)
+		// One or more patterns, each optionally followed by "@ delta".
+		if (!ParsePatternCandidates(value, 0, candidates, error))
 		{
-			long long d = 0;
-			if (!ParseInteger(value.substr(at + 1), d))
-			{
-				if (error) *error = "bad delta after '@' in '" + value + "'";
-				return false;
-			}
-			delta = (int)d;
-			patternText = value.substr(0, at);
-		}
-		if (!pattern.Parse(patternText))
-		{
-			if (error) *error = "not an address, keyword or byte pattern: '" + value + "'";
+			if (error && error->empty()) *error = "not an address, keyword or byte pattern: '" + value + "'";
 			return false;
 		}
 		kind = Pattern;
+		pattern = candidates[0].pattern;
+		delta = candidates[0].delta;
 		return true;
 	}
 };
