@@ -68,7 +68,9 @@ static const struct luaL_Reg mfunclib[] = {
 	{ "OnHTTPReq", lua_HTTPReq },
 	{ "OnEvent", lua_Event },
 	{ "OnCommand", lua_Command },
+#ifndef _LUA_NOSQL
 	{ "SQLEnv", luaopen_luasql_mysql },
+#endif
 
 	{ "Create3DText", lua_Create3DText },
 	{ "Set3DTextText", lua_Set3DTextText },
