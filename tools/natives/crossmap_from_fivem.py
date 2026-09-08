@@ -24,6 +24,7 @@ Examples:
 """
 import argparse
 import json
+import os
 import re
 import sys
 import urllib.request
@@ -34,6 +35,23 @@ NATIVEDB_URL = "https://raw.githubusercontent.com/alloc8or/gta5-nativedb-data/ma
 VERSIONS = [350, 372, 393, 463, 505, 573, 617, 678, 757, 791, 877, 944, 1011, 1103, 1180,
             1290, 1365, 1493, 1604, 1737, 1868, 2060, 2189, 2372, 2545, 2802, 2944]
 HASH = re.compile(r"0[xX]([0-9A-Fa-f]{16})")
+
+
+def pe_file_version(path):
+    """(version string, build number) from a PE's VS_FIXEDFILEINFO, or (None, None).
+
+    Reads the file directly, so it works on Linux (where GetFileVersionInfo is
+    not available) for a GTA5.exe under a Proton prefix. Scans for the
+    VS_FIXEDFILEINFO signature 0xFEEF04BD and reads the file-version dwords."""
+    import struct
+    with open(path, "rb") as handle:
+        data = handle.read()
+    sig = data.find(b"\xbd\x04\xef\xfe")
+    if sig < 0 or sig + 16 > len(data):
+        return None, None
+    ms, ls = struct.unpack_from("<II", data, sig + 8)
+    version = "%d.%d.%d.%d" % (ms >> 16, ms & 0xFFFF, ls >> 16, ls & 0xFFFF)
+    return version, (ls >> 16)
 
 
 def column_for(build):
@@ -93,12 +111,20 @@ def load_names(source):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--version", help="game version as client.log prints it, e.g. 1.0.3889.0")
+    parser.add_argument("--exe", help="path to GTA5.exe; the game version and build are read from it (works on Linux, e.g. for a Proton prefix)")
     parser.add_argument("--build", type=int, help="game build number (third version component), e.g. 3889")
     parser.add_argument("--universal", default=UNIVERSAL_URL, help="CrossMapping_Universal.h path or URL (default: FiveM master on GitHub)")
     parser.add_argument("--nativedb", default=NATIVEDB_URL, help="natives.json path or URL for the names, 'none' to skip")
     parser.add_argument("--registered", help="natives-<version>.registered.txt written by orange-core (or the extracted list): drop pairs the game does not register")
     parser.add_argument("--out", help="output file (default: natives-<version>.txt or stdout)")
+    parser.add_argument("--skip-existing", action="store_true", help="do nothing if the output file already exists")
     args = parser.parse_args()
+
+    if args.exe and not (args.version or args.build):
+        args.version, exe_build = pe_file_version(args.exe)
+        if not args.version:
+            parser.error("could not read the version resource from %s" % args.exe)
+        sys.stderr.write("%s is GTA V %s (build %d)\n" % (args.exe, args.version, exe_build))
 
     build = args.build
     if args.version:
@@ -109,6 +135,11 @@ def main():
     if not build:
         parser.error("--version or --build is required")
     column = column_for(build)
+
+    out_path = args.out or ("natives-%s.txt" % args.version if args.version else None)
+    if args.skip_existing and out_path and os.path.exists(out_path):
+        sys.stderr.write("%s already exists, nothing to do\n" % out_path)
+        return
 
     rows = parse_rows(fetch(args.universal, "the universal crossmap"))
     if not rows:
@@ -148,7 +179,6 @@ def main():
                       % (len(registered), stats["unregistered"], missing))
     output = "\n".join(header + lines) + "\n"
 
-    out_path = args.out or ("natives-%s.txt" % args.version if args.version else None)
     if out_path:
         with open(out_path, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(output)

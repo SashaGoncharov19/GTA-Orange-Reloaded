@@ -20,7 +20,7 @@ how offsets are resolved is in `docs/UPDATING_OFFSETS.md`.
 | Game offsets | One table (`orange-core/GameOffsets.cpp`, 92 entries) with a name, the reference RVA (January 2017 build), byte pattern candidates and a required/optional flag per entry. Resolution order: `offsets.ini [version]` → `[default]` → reference RVA (reference build only) → pattern scan → unresolved. **Only 9 entries are required** (the script engine globals and functions), all of them found by pattern on 1.0.3889.0; everything else is optional and has a fallback. |
 | Hooks | The FiveM approach (`rage-scripting-five`), with MinHook: the game's "start the startup script" function triggers GTA:Orange's initialisation, `GtaThread::Tick` only runs GTA:Orange's threads (the single player scripts stay frozen), the script id comparison answers "same script", the window message pump is the per-frame hook. Present is hooked through the vtable of a temporary swap chain, the game window comes from the swap chain. The reference build's call-site patches (code cave) remain as fallbacks. |
 | Script thread | The thread object is allocated with a large zeroed tail and reads the script handler position from the game's own Kill code (`+0x110` on the reference build, `+0x118` since 1.0.2699), vtable slot 5 is reserved for `CacheThreadData` (1.0.3570+). |
-| Natives | `Natives.h` calls natives by canonical hash; `Core/NativeTable.cpp` translates through `natives-<version>.txt` and walks the obfuscated registration table (1.0.1290+). **The launcher generates `natives-<version>.txt` automatically** from FiveM's public `CrossMapping_Universal.h` when it is missing (`tools/natives/crossmap_from_fivem.py` does the same by hand and adds names). |
+| Natives | `Natives.h` calls natives by canonical hash; `Core/NativeTable.cpp` translates through `natives-<version>.txt` and walks the obfuscated registration table (1.0.1290+). **`natives-<version>.txt` is generated automatically** from FiveM's public `CrossMapping_Universal.h`: by `gta-orange-proton.sh` before injecting (Linux side, reads the version out of `GTA5.exe`) and by `Launcher.exe` from inside the prefix. The launcher falls back to reading the game version from the running process, because under Proton the game's own path is a drive mapping it usually cannot open. |
 | Game dump | `Launcher.exe --dump-game` (or `./gta-orange-proton.sh --dump-game`) writes the unpacked in-memory `GTA5.exe` to `GTA5-<version>.dump.exe`, section table fixed so file offsets equal RVAs. |
 
 Pull requests, in order: #1 revival, #2 offsets table + launcher logging,
@@ -149,7 +149,10 @@ Tick and script id hooks pass everything through).
 * Natives added after 1.0.2944 keep their canonical hash; orange-core uses
   the canonical hash whenever no translation exists, so they work without a
   line in the file. `natives-<version>.registered.txt` (written by
-  orange-core on every non-reference build) lists what the game registers.
+  orange-core once the game is ready, on every non-reference build) lists what
+  the game registers. It is written at that point and not at injection time
+  because the registration table is still empty while the first loading screen
+  runs, which is when the launcher injects.
 
 ## 6. Testing candidates for a build that does not resolve
 

@@ -169,11 +169,15 @@ jobs:
         shell: bash
         run: |
           tr -d '\r' < tools/proton/gta-orange-proton.sh > dist/client/gta-orange-proton.sh
-          for f in dist/server/update-server.sh dist/client/gta-orange-proton.sh; do
+          # The Proton helper generates natives-<version>.txt with this tool
+          # before injecting, so it has to travel with the client package.
+          tr -d '\r' < tools/natives/crossmap_from_fivem.py > dist/client/crossmap_from_fivem.py
+          for f in dist/server/update-server.sh dist/client/gta-orange-proton.sh dist/client/crossmap_from_fivem.py; do
             tr -d '\r' < "$f" > "$f.lf" && mv -f "$f.lf" "$f"
             if grep -q $'\r' "$f"; then echo "CRLF still present in $f"; exit 1; fi
           done
           bash -n dist/client/gta-orange-proton.sh
+          python3 -c "import ast,sys; ast.parse(open('dist/client/crossmap_from_fivem.py').read())"
 
       - name: Package
         shell: pwsh

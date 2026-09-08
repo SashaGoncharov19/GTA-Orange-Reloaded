@@ -29,18 +29,6 @@ static DWORD WINAPI InstallHooksThread(LPVOID)
 	return 0;
 }
 
-// On a build other than the reference one, write the natives the game
-// registered (build hash + handler RVA) next to the DLL: the raw material
-// for natives-<version>.txt (docs/PORTING_STATUS.md). Runs on its own thread
-// a moment after injection, never inside the loader lock.
-static DWORD WINAPI DumpNativesThread(LPVOID)
-{
-	Sleep(3000);
-	std::string path = CGlobals::Get().orangePath + "\\natives-" + GameOffsets::GameVersion() + ".registered.txt";
-	NativeTable::DumpRegistered(path);
-	return 0;
-}
-
 static void StartThread(LPTHREAD_START_ROUTINE routine, const char* what)
 {
 	HANDLE thread = CreateThread(NULL, 0, routine, NULL, 0, NULL);
@@ -76,8 +64,9 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 			<< (CGlobals::Get().isDeveloper ? " (developer mode)" : "") << (CGlobals::Get().storyMode ? " (story mode)" : "") << std::endl;
 
 		bool patched = PreLoadPatches();
-		if (GameOffsets::IsInitialized() && !GameOffsets::IsReferenceBuild())
-			StartThread(DumpNativesThread, "the natives dump");
+		// The natives the game registered are dumped from OnGameReady (see
+		// orange-core.cpp): injection happens during the first loading screen,
+		// when the registration table is still empty.
 		if (patched)
 			StartThread(InstallHooksThread, "the hook installation");
 		else

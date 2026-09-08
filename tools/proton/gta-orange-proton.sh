@@ -89,6 +89,34 @@ show_log() {
 	fi
 }
 
+# What the auto-updater did on the last run. The launcher replaces itself and
+# restarts, so "up to date" on the second start is the normal, successful end
+# of an update; without this the whole thing is invisible in the output.
+summarize_update() {
+	[ -f "$LAUNCHER_LOG" ] || return 0
+	local running downloaded remote
+	running="$(grep -a 'Launcher .* starting' "$LAUNCHER_LOG" | tail -n 1 | sed -E 's/.*Launcher ([^ ]+) starting.*/\1/')"
+	downloaded="$(grep -ac 'updater: downloading' "$LAUNCHER_LOG" || true)"
+	remote="$(grep -a 'updater: local version' "$LAUNCHER_LOG" | tail -n 1 | sed -E 's/.*remote version ([^,]+).*/\1/')"
+	[ -n "$running" ] && log "Client version: $running"
+	if grep -aq 'just restarted after a self-update' "$LAUNCHER_LOG"; then
+		log "Auto-update: the client updated itself and restarted (now on $running)"
+	elif tail -n 60 "$LAUNCHER_LOG" | grep -aq 'updater: up to date'; then
+		log "Auto-update: already the newest ${remote:+$remote }build, nothing to download"
+	elif tail -n 60 "$LAUNCHER_LOG" | grep -aq 'updater: .*skipped'; then
+		log "Auto-update: skipped this run (see launcher.log for why)"
+	elif [ "${downloaded:-0}" -gt 0 ]; then
+		log "Auto-update: downloaded $downloaded file(s)"
+	fi
+	local crossmap
+	crossmap="$(ls -t "$CLIENT_DIR"/natives-*.txt 2>/dev/null | grep -v '\.registered\.txt$' | head -n 1 || true)"
+	if [ -n "$crossmap" ]; then
+		log "Natives crossmap: $(basename "$crossmap") ($(grep -avc '^;' "$crossmap" || echo 0) translations)"
+	else
+		log "Natives crossmap: MISSING - natives cannot be called, scripts will not start (see client.log)"
+	fi
+}
+
 # Reads client.log and explains the outcome of the last injection.
 summarize_client_log() {
 	[ -f "$CLIENT_LOG" ] || { log "client.log was not written: orange-core.dll did not load inside GTA5.exe (see launcher.log)"; return; }
@@ -131,6 +159,7 @@ check_package_version() {
 if [ "$LOGS_ONLY" = 1 ]; then
 	show_log "$LAUNCHER_LOG" 40
 	show_log "$CLIENT_LOG" 60
+	summarize_update
 	summarize_client_log
 	check_package_version
 	exit 0
@@ -163,21 +192,76 @@ STEAM_ROOT="$(find_steam_root)" || die "Steam installation not found (set STEAM_
 log "Steam: $STEAM_ROOT"
 
 # --- library folder + Proton prefix of the game -------------------------------
+# Every Steam library folder: the root plus the ones libraryfolders.vdf lists.
+steam_libraries() {
+	local lib
+	echo "$STEAM_ROOT"
+	if [ -f "$STEAM_ROOT/steamapps/libraryfolders.vdf" ]; then
+		grep -oE '"path"[[:space:]]+"[^"]+"' "$STEAM_ROOT/steamapps/libraryfolders.vdf" \
+			| sed -E 's/"path"[[:space:]]+"([^"]+)"/\1/'
+	fi
+}
+
 find_compatdata() {
 	local lib
-	local libs=("$STEAM_ROOT")
-	if [ -f "$STEAM_ROOT/steamapps/libraryfolders.vdf" ]; then
-		while IFS= read -r lib; do
-			libs+=("$lib")
-		done < <(grep -oE '"path"[[:space:]]+"[^"]+"' "$STEAM_ROOT/steamapps/libraryfolders.vdf" | sed -E 's/"path"[[:space:]]+"([^"]+)"/\1/')
-	fi
-	for lib in "${libs[@]}"; do
+	while IFS= read -r lib; do
 		if [ -d "$lib/steamapps/compatdata/$APPID" ]; then
 			echo "$lib/steamapps/compatdata/$APPID"
 			return 0
 		fi
-	done
+	done < <(steam_libraries)
 	return 1
+}
+
+# GTA5.exe on the Linux side (the launcher only ever sees it through the
+# prefix's drive mapping, which it cannot always open).
+find_game_exe() {
+	local lib
+	while IFS= read -r lib; do
+		if [ -f "$lib/steamapps/common/Grand Theft Auto V/GTA5.exe" ]; then
+			echo "$lib/steamapps/common/Grand Theft Auto V/GTA5.exe"
+			return 0
+		fi
+	done < <(steam_libraries)
+	return 1
+}
+
+# orange-core translates every native it calls to the hash the running build
+# registers, through natives-<game version>.txt next to orange-core.dll.
+# Launcher.exe downloads that table itself, but only when it can read the game
+# version, which needs the game file - so generate it here, where GTA5.exe is
+# a plain Linux path. Never fatal: without it orange-core still loads and says
+# what is missing.
+ensure_natives_crossmap() {
+	local exe tool candidate
+	exe="$(find_game_exe)" || { log "Natives crossmap: GTA5.exe not found in any Steam library, leaving it to Launcher.exe"; return 0; }
+	tool=""
+	for candidate in "$CLIENT_DIR/crossmap_from_fivem.py" \
+	                 "$(dirname "${BASH_SOURCE[0]}")/../natives/crossmap_from_fivem.py"; do
+		if [ -f "$candidate" ]; then
+			tool="$candidate"
+			break
+		fi
+	done
+	if [ -z "$tool" ]; then
+		log "Natives crossmap: crossmap_from_fivem.py not found next to this script, leaving it to Launcher.exe"
+		return 0
+	fi
+	if ! command -v python3 >/dev/null 2>&1; then
+		log "Natives crossmap: python3 not installed, leaving it to Launcher.exe"
+		return 0
+	fi
+	log "Natives crossmap: checking (game: $exe)"
+	local output status
+	set +e
+	output="$( cd "$CLIENT_DIR" && python3 "$tool" --exe "$exe" --skip-existing 2>&1 )"
+	status=$?
+	set -e
+	while IFS= read -r line; do
+		[ -n "$line" ] && log "  $line"
+	done <<< "$output"
+	[ "$status" -eq 0 ] || log "Natives crossmap: generation failed (no internet?), leaving it to Launcher.exe"
+	return 0
 }
 COMPAT_DATA="$(find_compatdata)" || die "Proton prefix for app $APPID not found. Start GTA V once through Steam (with Proton enabled) and try again."
 log "Proton prefix: $COMPAT_DATA"
@@ -217,6 +301,8 @@ until game_running; do
 	waited=$((waited + 2))
 	[ "$waited" -ge "$TIMEOUT" ] && die "Timed out waiting for GTA5.exe"
 done
+ensure_natives_crossmap
+
 log "GTA5.exe is running, injecting orange-core.dll (follow along with: tail -f '$LAUNCHER_LOG')"
 
 # --- inject inside the same prefix --------------------------------------------
@@ -248,6 +334,7 @@ if [ "$LOG_TAIL" = 1 ]; then
 	sleep 3
 	show_log "$LAUNCHER_LOG" 25
 	show_log "$CLIENT_LOG" 40
+	summarize_update
 	summarize_client_log
 	check_package_version
 	log "Re-print the logs any time with: $0 --logs"

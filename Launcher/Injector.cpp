@@ -502,6 +502,84 @@ std::wstring Injector::GameFileVersion(const std::wstring& exePath)
 	return FileVersionOf(exePath);
 }
 
+// The same version, read from the running process instead of from the file.
+// Under Proton the game's own path ("S:\\steamapps\\...") is a drive mapping the
+// launcher process often cannot open (CreateFileW fails with ERROR_PATH_NOT_FOUND),
+// so the file based read above returns nothing there. The mapped image always
+// carries the version resource, and reading process memory needs no file access.
+std::wstring Injector::GameProcessVersion()
+{
+	int processId = Get().FindProcess(PROCESS_NAME);
+	if (processId == -1)
+		return L"";
+	HANDLE process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+	if (!process)
+		return L"";
+
+	uintptr_t base = 0;
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, processId);
+	if (snapshot != INVALID_HANDLE_VALUE)
+	{
+		MODULEENTRY32 module;
+		module.dwSize = sizeof(module);
+		if (Module32First(snapshot, &module))
+		{
+			do {
+				if (_wcsicmp(PROCESS_NAME, module.szModule) == 0)
+				{
+					base = (uintptr_t)module.modBaseAddr;
+					break;
+				}
+			} while (Module32Next(snapshot, &module));
+		}
+		CloseHandle(snapshot);
+	}
+	if (!base)
+	{
+		CloseHandle(process);
+		return L"";
+	}
+
+	std::wstring version;
+	IMAGE_DOS_HEADER dos = { 0 };
+	IMAGE_NT_HEADERS64 nt = { 0 };
+	SIZE_T read = 0;
+	if (ReadProcessMemory(process, (LPCVOID)base, &dos, sizeof(dos), &read) && read == sizeof(dos)
+		&& dos.e_magic == IMAGE_DOS_SIGNATURE
+		&& ReadProcessMemory(process, (LPCVOID)(base + dos.e_lfanew), &nt, sizeof(nt), &read) && read == sizeof(nt)
+		&& nt.Signature == IMAGE_NT_SIGNATURE)
+	{
+		const IMAGE_DATA_DIRECTORY& resources = nt.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE];
+		// The whole resource directory of GTA5.exe is well under a megabyte;
+		// the cap only keeps a corrupt header from asking for a huge buffer.
+		const DWORD kMaxResourceBytes = 8 * 1024 * 1024;
+		if (resources.VirtualAddress && resources.Size && resources.Size <= kMaxResourceBytes)
+		{
+			std::vector<unsigned char> buffer(resources.Size);
+			if (ReadProcessMemory(process, (LPCVOID)(base + resources.VirtualAddress), buffer.data(), buffer.size(), &read) && read >= 16)
+			{
+				// VS_FIXEDFILEINFO: dwSignature 0xFEEF04BD, then dwStrucVersion,
+				// dwFileVersionMS, dwFileVersionLS.
+				const unsigned char signature[4] = { 0xBD, 0x04, 0xEF, 0xFE };
+				for (size_t i = 0; i + 16 <= read; ++i)
+				{
+					if (memcmp(buffer.data() + i, signature, sizeof(signature)) != 0)
+						continue;
+					DWORD ms = 0, ls = 0;
+					memcpy(&ms, buffer.data() + i + 8, sizeof(ms));
+					memcpy(&ls, buffer.data() + i + 12, sizeof(ls));
+					wchar_t text[64];
+					swprintf_s(text, L"%u.%u.%u.%u", HIWORD(ms), LOWORD(ms), HIWORD(ls), LOWORD(ls));
+					version = text;
+					break;
+				}
+			}
+		}
+	}
+	CloseHandle(process);
+	return version;
+}
+
 std::wstring Injector::FindGameExePath()
 {
 	int pid = FindProcess(PROCESS_NAME);

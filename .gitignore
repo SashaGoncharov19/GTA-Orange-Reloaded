@@ -285,3 +285,7 @@ natives-*.*.*.*.txt
 natives-*.registered.txt
 offsets-*.generated.ini
 GTA5-*.dump.exe
+
+# Python bytecode from the tools
+__pycache__/
+*.pyc

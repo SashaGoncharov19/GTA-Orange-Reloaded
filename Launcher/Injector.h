@@ -40,6 +40,9 @@ public:
 	std::wstring FindGameExePath();
 	// "1.0.3889.0" from the version resource of an executable, "" when unreadable.
 	static std::wstring GameFileVersion(const std::wstring& exePath);
+	// Version of the running GTA5.exe read from its mapped image. Works where
+	// the file itself cannot be opened (Proton drive mappings). "" on failure.
+	static std::wstring GameProcessVersion();
 
 
 	// static methods

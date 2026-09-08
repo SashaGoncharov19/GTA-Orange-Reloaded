@@ -417,6 +417,17 @@ static bool ScriptsUsable()
 	return GameOffsets::IsReferenceBuild() || NativeTable::TranslationCount() > 0;
 }
 
+// Writes the natives the running build registered (build hash + handler RVA)
+// next to the DLL: the raw material for a crossmap, and the proof that the
+// registration table was found. Only meaningful once the game is ready - at
+// injection time (first loading screen) the table is still empty.
+static DWORD WINAPI DumpNativesThread(LPVOID)
+{
+	std::string path = CGlobals::Get().orangePath + "\\natives-" + GameOffsets::GameVersion() + ".registered.txt";
+	NativeTable::DumpRegistered(path);
+	return 0;
+}
+
 void OnGameReady()
 {
 	if (g_gameReady)
@@ -447,6 +458,13 @@ void OnGameReady()
 	}
 
 	GameMem("EventHook").farJmp(eventHook);
+
+	if (!GameOffsets::IsReferenceBuild())
+	{
+		HANDLE thread = CreateThread(NULL, 0, DumpNativesThread, NULL, 0, NULL);
+		if (thread)
+			CloseHandle(thread);
+	}
 	log_info << "Game ready: done" << std::endl;
 }
 

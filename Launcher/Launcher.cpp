@@ -458,7 +458,16 @@ void LaunchGame()
 		{
 			std::wstring gameExe = Injector::Get().FindGameExePath();
 			std::wstring gameVersion = gameExe.empty() ? L"" : Injector::GameFileVersion(gameExe);
-			LauncherLog(L"game executable: " + (gameExe.empty() ? std::wstring(L"(not found)") : gameExe) + L", version " + (gameVersion.empty() ? std::wstring(L"unknown") : gameVersion));
+			std::wstring versionSource = L" (from the file)";
+			if (gameVersion.empty())
+			{
+				// Under Proton the game's own path is a drive mapping the
+				// launcher cannot open; the mapped image can be read instead.
+				gameVersion = Injector::GameProcessVersion();
+				versionSource = L" (from the running process)";
+			}
+			LauncherLog(L"game executable: " + (gameExe.empty() ? std::wstring(L"(not found)") : gameExe) + L", version "
+				+ (gameVersion.empty() ? std::wstring(L"unknown") : gameVersion + versionSource));
 			SetSplashStatus(L"Checking the natives crossmap...");
 			EnsureNativesCrossmap(orangeDir, gameVersion);
 		}
