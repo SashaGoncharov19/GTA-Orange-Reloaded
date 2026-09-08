@@ -256,7 +256,9 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 		return false;
 	}
 
-	ULONGLONG deadline = GetTickCount64() + (ULONGLONG)timeoutSeconds * 1000ULL;
+	ULONGLONG started = GetTickCount64();
+	ULONGLONG deadline = started + (ULONGLONG)timeoutSeconds * 1000ULL;
+	ULONGLONG nextHeartbeat = started + 15000ULL;
 	HMODULE hMod = NULL;
 	std::wstring exePath;
 	while (hMod == NULL)
@@ -287,9 +289,15 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 				CloseHandle(process);
 				return false;
 			}
+			if (GetTickCount64() > nextHeartbeat)
+			{
+				LauncherLog("unpack wait: still looking for the GTA5.exe module in the process (" + std::to_string((GetTickCount64() - started) / 1000) + "s)");
+				nextHeartbeat += 15000ULL;
+			}
 			Sleep(50);
 		}
 	}
+	LauncherLog(L"unpack wait: GTA5.exe module found, image " + exePath);
 
 	unsigned char buff[10] = { 0 };
 	if (!ReadProcessMemory(process, (LPVOID)((uint64_t)hMod + 0x1000), buff, 10, NULL))
@@ -332,6 +340,11 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 			LauncherLog("unpack wait: code section did not change within the timeout");
 			CloseHandle(process);
 			return false;
+		}
+		if (GetTickCount64() > nextHeartbeat)
+		{
+			LauncherLog("unpack wait: still waiting for the code section to change (" + std::to_string((GetTickCount64() - started) / 1000) + "s)");
+			nextHeartbeat += 15000ULL;
 		}
 	}
 }
