@@ -1,3 +1,0 @@
-/mnt/c/Repos/GTA-Orange-Reloaded/deps/ServerDeps/yaml-cpp/CMakeFiles/debuggable.dir
-/mnt/c/Repos/GTA-Orange-Reloaded/deps/ServerDeps/yaml-cpp/CMakeFiles/releasable.dir
-/mnt/c/Repos/GTA-Orange-Reloaded/deps/ServerDeps/yaml-cpp/CMakeFiles/yaml-cpp.dir

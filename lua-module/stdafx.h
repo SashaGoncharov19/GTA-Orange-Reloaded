@@ -1,10 +1,8 @@
 
 #pragma once
 
-#ifdef _WINDOWS
+#ifdef _WIN32
 #include "targetver.h"
-
-#pragma comment (lib,"lua51.lib")
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -13,6 +11,8 @@
 
 #include <string>
 #include <cstring>
+#include <cstdlib>
+#include <cstdio>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -21,13 +21,16 @@
 #include <functional>
 #include "API.h"
 
+#ifndef _LUA_NOSQL
 #include "mysql.h"
+#endif
 
 #include "lua.hpp"
 #include "lua_Main.h"
 
 #include "SResource.h"
 
+// Lua 5.2 style helper that LuaJIT 2.1.0-beta2 does not provide.
 static void luaL_setfuncs(lua_State *L, const luaL_Reg *l, int nup)
 {
 	luaL_checkstack(L, nup + 1, "too many upvalues");

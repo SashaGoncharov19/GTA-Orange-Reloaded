@@ -1,0 +1,15 @@
+.git
+.github
+build
+build-*
+dist
+temp
+deps/ClientDeps
+deps/RakNet/Samples
+deps/RakNet/DependentExtensions
+deps/RakNet/Help
+orange-core
+Launcher
+docs
+*.zip
+*.tar.gz

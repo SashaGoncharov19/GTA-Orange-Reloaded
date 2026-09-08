@@ -137,7 +137,7 @@ void Plugin::LoadPlugins()
         FindClose(fileh);
     }
 
-    for each(auto resource in CConfig::Get()->Resources)
+    for (auto& resource : CConfig::Get()->Resources)
     {
         char path[128];
         sprintf_s(path, 128, "resources\\%s\\resource.yml", resource.c_str());
@@ -377,7 +377,7 @@ void Plugin::KeyEvent(RakNet::BitStream *bitStream, RakNet::Packet *packet)
 {
     DWORD keycode;
     bitStream->Read(keycode);
-    Plugin::Trigger("keyPress", (ULONG)CNetworkPlayer::GetByGUID(packet->guid)->GetID(), keycode);
+    Plugin::Trigger("keyPress", (unsigned long)CNetworkPlayer::GetByGUID(packet->guid)->GetID(), (unsigned long)keycode);
 }
 
 void Plugin::ServerEvent(RakNet::BitStream *bitStream, RakNet::Packet *packet)

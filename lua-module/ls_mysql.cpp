@@ -8,7 +8,6 @@
 
 #ifndef _LUA_NOSQL
 
-#pragma comment(lib, "libmysql.lib")
 
 #include <assert.h>
 #include <stdio.h>

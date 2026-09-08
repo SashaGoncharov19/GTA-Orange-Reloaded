@@ -15,9 +15,8 @@ class Injector
 	// methods
 	int FindProcess(std::wstring procName);
 	GameVersion GetGameVersion();
-	void WaitUntilGameStarts();
-	bool Inject(int processId, std::string dllName);
-	void WaitForUnpackFinished(int pid);
+	bool Inject(int processId, std::string dllName, std::string& error);
+	bool WaitForUnpackFinished(int pid, int timeoutSeconds);
 
 	// static fields
 	static Injector * instance;
@@ -29,7 +28,10 @@ public:
 	// methods
 	void Run(std::wstring folder, std::wstring pePath);
 	void RunSteam();
-	void InjectAll(bool waitForUnpack = true);
+	// Waits until GTA5.exe shows up in the process list. Returns false on timeout.
+	bool WaitUntilGameStarts(int timeoutSeconds);
+	// Injects all pushed libraries into the running GTA5.exe. Returns false on failure.
+	bool InjectAll(bool waitForUnpack = true, int unpackTimeoutSeconds = 120);
 	void PushLibrary(std::string path);
 
 
@@ -40,4 +42,3 @@ public:
 		return *instance;
 	}
 };
-

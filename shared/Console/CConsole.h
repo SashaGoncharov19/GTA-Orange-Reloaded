@@ -120,6 +120,7 @@ namespace color {
 		return s;
 	}
 
+#ifdef _WIN32
 	struct color {
 		color(WORD attribute) :m_color(attribute) {};
 		WORD m_color;
@@ -129,10 +130,9 @@ namespace color {
 	std::basic_ostream<_Elem, _Traits>&
 		operator<<(std::basic_ostream<_Elem, _Traits>& i, color& c)
 	{
-#ifdef _WIN32
 		HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
 		SetConsoleTextAttribute(hStdout, c.m_color);
-#endif
 		return i;
 	}
+#endif
 }

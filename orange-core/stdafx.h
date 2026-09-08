@@ -167,10 +167,14 @@ using namespace RakNet;
 #include "orange-core.h"
 #include "Utils.h"
 
+// Experimental Scaleform DrawText support; needs the proprietary GFx SDK
+// libraries, so it is only compiled in with -DORANGE_ENABLE_SCALEFORM=ON.
+#ifdef ORANGE_WITH_SCALEFORM
 #define GFX_ENABLE_DRAWTEXT 1
 #include "GFx\GFx_DrawText.h"
 #include "GFx.h"
 #include "ScaleformManager.h"
+#endif
 
 IMGUI_API LRESULT ImGui_ImplDX11_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 void CreateRenderTarget();

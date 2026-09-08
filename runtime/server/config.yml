@@ -1,0 +1,19 @@
+# GTA:Orange dedicated server configuration.
+# The server reads this file from its working directory.
+
+# Name shown to players
+name: GTA:Orange test server
+
+# UDP port used by the game protocol (RakNet)
+port: 7788
+
+# TCP port of the built-in HTTP server (defaults to port + 1)
+httpport: 7789
+
+# Maximum number of players (1-256)
+players: 32
+
+# Resources to start. Each entry is a folder under resources/ containing a
+# resource.yml (which names the module that runs it, e.g. "lua").
+resources:
+  - example

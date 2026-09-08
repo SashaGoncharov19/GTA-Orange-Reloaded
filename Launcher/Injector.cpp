@@ -15,8 +15,10 @@ void Injector::Run(std::wstring folder, std::wstring pePath)
 	memset(&piProcessInfo, 0, sizeof(piProcessInfo));
 	siStartupInfo.cb = sizeof(siStartupInfo);
 	if (!CreateProcess(pePath.c_str(), Params, NULL, NULL, true, CREATE_SUSPENDED, NULL, folder.c_str(), &siStartupInfo, &piProcessInfo))
-		throw new std::exception("Can't start executable");
+		throw std::runtime_error("Can't start executable");
 	ResumeThread(piProcessInfo.hThread);
+	CloseHandle(piProcessInfo.hThread);
+	CloseHandle(piProcessInfo.hProcess);
 }
 
 void Injector::RunSteam()
@@ -24,45 +26,55 @@ void Injector::RunSteam()
 	ShellExecute(NULL, NULL, L"steam://run/271590", NULL, NULL, SW_SHOW);
 }
 
-void Injector::InjectAll(bool waitForUnpack)
+bool Injector::InjectAll(bool waitForUnpack, int unpackTimeoutSeconds)
 {
-	WaitUntilGameStarts();
 	Sleep(100);
 	int pid = FindProcess(PROCESS_NAME);
-	if(waitForUnpack)
-		WaitForUnpackFinished(pid);
-	for each (std::string lib in libs)
+	if (pid == -1)
 	{
-		if (!Inject(pid, lib.c_str()))
+		MessageBox(NULL, L"GTA5.exe is not running", L"GTA:Orange Launcher", MB_OK | MB_ICONERROR);
+		return false;
+	}
+	if (waitForUnpack)
+		WaitForUnpackFinished(pid, unpackTimeoutSeconds);
+	for (const std::string& lib : libs)
+	{
+		std::string error;
+		if (!Inject(pid, lib, error))
 		{
-			MessageBox(NULL, L"Not injected", L"Alert", MB_OK | MB_ICONERROR);
-			return;
+			std::string message = "Failed to inject " + lib + "\n" + error;
+			MessageBoxA(NULL, message.c_str(), "GTA:Orange Launcher", MB_OK | MB_ICONERROR);
+			return false;
 		}
 	}
 	Injected = true;
+	return true;
 }
 
 void Injector::PushLibrary(std::string path)
 {
 	if (Injected == true)
-		throw new std::exception("Libraries are already injected");
+		throw std::runtime_error("Libraries are already injected");
 	if (!Utils::FileExist(Utils::MultibyteToUnicode(path)))
-		throw new std::exception("Library doesn't exist");
+		throw std::runtime_error("Library doesn't exist: " + path);
 	libs.push_back(path);
 }
 
 int Injector::FindProcess(std::wstring procName)
 {
-	HANDLE hSnap = INVALID_HANDLE_VALUE, hProcess = INVALID_HANDLE_VALUE;
+	HANDLE hSnap = INVALID_HANDLE_VALUE;
 	PROCESSENTRY32 ProcessStruct;
 	ProcessStruct.dwSize = sizeof(PROCESSENTRY32);
 	hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 	if (hSnap == INVALID_HANDLE_VALUE)
 		return -1;
 	if (Process32First(hSnap, &ProcessStruct) == FALSE)
+	{
+		CloseHandle(hSnap);
 		return -1;
+	}
 	do {
-		if (wcscmp(ProcessStruct.szExeFile, procName.c_str()) == 0) {
+		if (_wcsicmp(ProcessStruct.szExeFile, procName.c_str()) == 0) {
 			CloseHandle(hSnap);
 			return ProcessStruct.th32ProcessID;
 		}
@@ -76,62 +88,119 @@ GameVersion Injector::GetGameVersion()
 	return GameVersion();
 }
 
-void Injector::WaitUntilGameStarts()
+bool Injector::WaitUntilGameStarts(int timeoutSeconds)
 {
-	while (FindProcess(L"GTA5.exe") == -1);
-}
-
-bool Injector::Inject(int processId, std::string dllName)
-{
-	HANDLE process = OpenProcess(PROCESS_ALL_ACCESS, false, processId);
-	if (!process)
-		return false;
-	LPVOID LoadLibraryA_ = (LPVOID)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "LoadLibraryA");
-	LPVOID LoadComp = VirtualAllocEx(process, NULL, dllName.length(), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-	WriteProcessMemory(process, LoadComp, dllName.c_str(), dllName.length(), NULL);
-	HANDLE injectThread = CreateRemoteThread(process, NULL, NULL, (LPTHREAD_START_ROUTINE)LoadLibraryA_, LoadComp, 0, NULL);
-	WaitForSingleObject(injectThread, INFINITE);
-	VirtualFreeEx(process, LoadComp, dllName.length(), MEM_RELEASE);
-	CloseHandle(injectThread);
-	CloseHandle(process);
+	ULONGLONG deadline = GetTickCount64() + (ULONGLONG)timeoutSeconds * 1000ULL;
+	while (FindProcess(PROCESS_NAME) == -1)
+	{
+		if (timeoutSeconds > 0 && GetTickCount64() > deadline)
+			return false;
+		Sleep(250);
+	}
 	return true;
 }
 
-void Injector::WaitForUnpackFinished(int pid)
+bool Injector::Inject(int processId, std::string dllName, std::string& error)
+{
+	HANDLE process = OpenProcess(PROCESS_ALL_ACCESS, false, processId);
+	if (!process)
+	{
+		error = "OpenProcess failed (error " + std::to_string(GetLastError()) + ")";
+		return false;
+	}
+	LPVOID LoadLibraryA_ = (LPVOID)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "LoadLibraryA");
+	size_t size = dllName.length() + 1;
+	LPVOID LoadComp = VirtualAllocEx(process, NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	if (!LoadComp)
+	{
+		error = "VirtualAllocEx failed (error " + std::to_string(GetLastError()) + ")";
+		CloseHandle(process);
+		return false;
+	}
+	WriteProcessMemory(process, LoadComp, dllName.c_str(), size, NULL);
+	HANDLE injectThread = CreateRemoteThread(process, NULL, 0, (LPTHREAD_START_ROUTINE)LoadLibraryA_, LoadComp, 0, NULL);
+	if (!injectThread)
+	{
+		error = "CreateRemoteThread failed (error " + std::to_string(GetLastError()) + ")";
+		VirtualFreeEx(process, LoadComp, 0, MEM_RELEASE);
+		CloseHandle(process);
+		return false;
+	}
+	WaitForSingleObject(injectThread, INFINITE);
+	DWORD exitCode = 0;
+	GetExitCodeThread(injectThread, &exitCode);
+	VirtualFreeEx(process, LoadComp, 0, MEM_RELEASE);
+	CloseHandle(injectThread);
+	CloseHandle(process);
+	if (exitCode == 0)
+	{
+		// LoadLibraryA returned NULL inside the game: missing dependency, wrong
+		// architecture or the DLL refused to load (see client.log).
+		error = "LoadLibrary failed inside the game process";
+		return false;
+	}
+	return true;
+}
+
+// The retail executable is packed; wait until its code section has been
+// rewritten in memory before patching anything. Gives up after the timeout.
+bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 {
 	HANDLE process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+	if (!process)
+		return false;
 
-	MODULEENTRY32 ModEnt;
-	ModEnt.dwSize = sizeof(MODULEENTRY32);
-
+	ULONGLONG deadline = GetTickCount64() + (ULONGLONG)timeoutSeconds * 1000ULL;
 	HMODULE hMod = NULL;
-	HANDLE Snapshot1 = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid);
-
-	do {
-		Module32First(Snapshot1, &ModEnt);
-		do {
-			if (wcscmp(PROCESS_NAME, ModEnt.szModule) == 0)
+	while (hMod == NULL)
+	{
+		HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid);
+		if (snapshot != INVALID_HANDLE_VALUE)
+		{
+			MODULEENTRY32 ModEnt;
+			ModEnt.dwSize = sizeof(MODULEENTRY32);
+			if (Module32First(snapshot, &ModEnt))
 			{
-				hMod = ModEnt.hModule;
-				break;
+				do {
+					if (_wcsicmp(PROCESS_NAME, ModEnt.szModule) == 0)
+					{
+						hMod = ModEnt.hModule;
+						break;
+					}
+				} while (Module32Next(snapshot, &ModEnt));
 			}
-		} while (Module32Next(Snapshot1, &ModEnt));
-	} while (hMod == NULL);
+			CloseHandle(snapshot);
+		}
+		if (hMod == NULL)
+		{
+			if (GetTickCount64() > deadline)
+			{
+				CloseHandle(process);
+				return false;
+			}
+			Sleep(50);
+		}
+	}
 
-	unsigned char buff[10];
+	unsigned char buff[10] = { 0 };
 	ReadProcessMemory(process, (LPVOID)((uint64_t)hMod + 0x1000), buff, 10, NULL);
 	for (;;)
 	{
-		Sleep(1);
-		unsigned char newBuff[10];
+		Sleep(5);
+		unsigned char newBuff[10] = { 0 };
 		ReadProcessMemory(process, (LPVOID)((uint64_t)hMod + 0x1000), newBuff, 10, NULL);
 		for (int i = 0; i < 10; ++i)
 		{
 			if (buff[i] != newBuff[i])
 			{
 				CloseHandle(process);
-				return;
+				return true;
 			}
+		}
+		if (GetTickCount64() > deadline)
+		{
+			CloseHandle(process);
+			return false;
 		}
 	}
 }

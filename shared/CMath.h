@@ -11,11 +11,12 @@
 
 #pragma once
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <windows.h>
 #else
-typedef unsigned long DWORD;
+#include <stdint.h>
 #include <string.h>
+typedef uint32_t DWORD;
 #endif
 #include <math.h>
 #include "CVector3.h"

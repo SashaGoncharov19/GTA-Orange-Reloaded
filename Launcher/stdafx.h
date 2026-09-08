@@ -19,6 +19,8 @@
 
 
 #include <vector>
+#include <string>
+#include <stdexcept>
 #include <cmath>
 #include <ctime>
 #include <iostream>
