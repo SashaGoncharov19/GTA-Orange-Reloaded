@@ -67,22 +67,61 @@ void Injector::RunSteam()
 static bool ProcessHasModule(int pid, const std::wstring& moduleName)
 {
 	bool found = false;
-	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid);
-	if (snapshot == INVALID_HANDLE_VALUE)
-		return false;
-	MODULEENTRY32 module;
-	module.dwSize = sizeof(module);
-	if (Module32First(snapshot, &module))
+	int seen = 0;
+	// Toolhelp first (works for the main executable in the unpack wait).
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
+	if (snapshot != INVALID_HANDLE_VALUE)
 	{
-		do {
-			if (_wcsicmp(moduleName.c_str(), module.szModule) == 0)
-			{
-				found = true;
-				break;
-			}
-		} while (Module32Next(snapshot, &module));
+		MODULEENTRY32 module;
+		module.dwSize = sizeof(module);
+		if (Module32First(snapshot, &module))
+		{
+			do {
+				++seen;
+				std::wstring path(module.szExePath);
+				size_t slash = path.find_last_of(L"\\/");
+				std::wstring base = slash == std::wstring::npos ? path : path.substr(slash + 1);
+				if (_wcsicmp(moduleName.c_str(), module.szModule) == 0 || _wcsicmp(moduleName.c_str(), base.c_str()) == 0)
+				{
+					found = true;
+					break;
+				}
+			} while (Module32Next(snapshot, &module));
+		}
+		CloseHandle(snapshot);
 	}
-	CloseHandle(snapshot);
+	// PSAPI second: under Wine the two enumerations do not always agree.
+	int seenPsapi = 0;
+	if (!found)
+	{
+		HANDLE process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+		if (process)
+		{
+			HMODULE modules[2048];
+			DWORD needed = 0;
+			if (EnumProcessModulesEx(process, modules, sizeof(modules), &needed, LIST_MODULES_ALL))
+			{
+				DWORD count = needed / sizeof(HMODULE);
+				if (count > 2048)
+					count = 2048;
+				for (DWORD i = 0; i < count && !found; ++i)
+				{
+					wchar_t path[MAX_PATH] = { 0 };
+					if (!GetModuleFileNameExW(process, modules[i], path, MAX_PATH))
+						continue;
+					++seenPsapi;
+					std::wstring full(path);
+					size_t slash = full.find_last_of(L"\\/");
+					std::wstring base = slash == std::wstring::npos ? full : full.substr(slash + 1);
+					if (_wcsicmp(moduleName.c_str(), base.c_str()) == 0)
+						found = true;
+				}
+			}
+			CloseHandle(process);
+		}
+	}
+	LauncherLog(L"inject: module check for " + moduleName + L": " + (found ? L"already loaded" : L"not loaded") + L" (toolhelp listed "
+		+ std::to_wstring(seen) + L" module(s), psapi " + std::to_wstring(seenPsapi) + L")");
 	return found;
 }
 

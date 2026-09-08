@@ -486,7 +486,11 @@ static void OnGameFrame()
 	// No startup-script / game-state hook on this build: the game is ready
 	// once the local player ped exists and the script thread collection is
 	// allocated.
-	if (!g_gameReady && !g_readyTriggerInstalled)
+	// Injected into a game that is already running (the normal case under
+	// Proton, --no-launch), the startup script ran long ago and its hook will
+	// never fire: the ped poll stays on until something declares the game
+	// ready. OnGameReady is idempotent, so whichever comes first wins.
+	if (!g_gameReady)
 	{
 		CWorld* world = CWorld::Get();
 		if (world && world->CPedPtr && ScriptEngine::ThreadCollectionReady())
