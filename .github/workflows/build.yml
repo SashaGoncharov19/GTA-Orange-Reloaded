@@ -83,7 +83,7 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DORANGE_BUILD_CLIENT=ON
 
       - name: Build
-        run: cmake --build build --parallel
+        run: cmake --build build --parallel -- -k 0
 
       - name: Install
         run: |

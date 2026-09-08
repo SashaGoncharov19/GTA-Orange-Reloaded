@@ -21,6 +21,11 @@
 #include <vector>
 #include <string>
 #include <stdexcept>
+#include <algorithm>
+#include <memory>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <cmath>
 #include <ctime>
 #include <iostream>

@@ -13,6 +13,24 @@
 
 #pragma region core
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cctype>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <memory>
+#include <array>
+#include <utility>
+#include <tuple>
+#include <limits>
+#include <chrono>
+#include <atomic>
+#include <iomanip>
+#include <stdexcept>
+#include <exception>
+#include <list>
+#include <deque>
 #include <windows.h>
 #include <string>
 #include <sstream>
