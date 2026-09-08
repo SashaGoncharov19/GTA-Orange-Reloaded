@@ -25,6 +25,19 @@ sudo apt install libmysqlclient21      # Debian/Ubuntu
 Ports: **7788/udp** (game) and **7789/tcp** (built-in HTTP server, used by
 resources via `OnHTTPReq`). Both are set in `config.yml`.
 
+Before starting the game, check that the server accepts players from the
+machine the game runs on:
+
+```bash
+./orange_handshake 127.0.0.1 7788        # or the server's address from another machine
+```
+
+It connects exactly like the game client (IPv4, the `ID_CONNECT_TO_SERVER`
+handshake with a nickname), prints what the server sends back (the RPCs of
+the resources) and ends with `RESULT: ... accepted the player` (exit code 0)
+or `RESULT: no answer from ...` (nothing listens there, a firewall, or a
+server bound to IPv6 only).
+
 The server runs its resources from `resources/<name>/` (see
 `resources/example/main.lua`) and reads commands from the terminal (`exit`
 stops it). When stdin is not a terminal (systemd, Docker) it keeps running

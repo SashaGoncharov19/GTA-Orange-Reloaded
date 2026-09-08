@@ -68,16 +68,20 @@ jobs:
       - name: Smoke test
         run: |
           cd dist/server
-          (timeout 10 ./orange_server < /dev/null > server.log 2>&1 || true) &
+          (timeout 20 ./orange_server < /dev/null > server.log 2>&1 || true) &
           sleep 4
           curl -sf http://127.0.0.1:7789/ | tee http.txt
           grep -q "running" http.txt
+          # a player connects the way the game client does
+          ./orange_handshake 127.0.0.1 7788 ci-smoke | tee handshake.txt
+          grep -q "accepted the player" handshake.txt
           wait
           echo "----- server.log -----"
           cat server.log
           grep -q "Server started" server.log
           grep -q "resource started" server.log
-          rm -f server.log http.txt
+          grep -q "player ci-smoke" server.log
+          rm -f server.log http.txt handshake.txt
 
       - name: Package
         run: tar -C dist -czf gta-orange-server-linux-x64.tar.gz server
@@ -163,12 +167,16 @@ jobs:
           Start-Sleep -Seconds 6
           $r = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:7789/
           Write-Host "HTTP: $($r.Content)"
+          # a player connects the way the game client does
+          & .\orange_handshake.exe 127.0.0.1 7788 ci-smoke
+          $handshake = $LASTEXITCODE
           Stop-Process -Id $p.Id -Force
           Start-Sleep -Seconds 1
           Write-Host "----- server.log -----"
           Get-Content server.log
           if ($r.Content -notmatch "running") { throw "unexpected HTTP response" }
           if (-not (Select-String -Path server.log -Pattern "Server started" -Quiet)) { throw "server did not start" }
+          if ($handshake -ne 0) { throw "orange_handshake exit code ${handshake}: the server did not accept a player" }
           Remove-Item stdin.txt, server.log, server.err -ErrorAction SilentlyContinue
 
       # The shell scripts end up on Linux machines; strip the CRLF that git on

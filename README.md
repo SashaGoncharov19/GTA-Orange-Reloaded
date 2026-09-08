@@ -55,6 +55,11 @@ docker run --rm -it -p 7788:7788/udp -p 7789:7789 \
 
 On Windows unzip `gta-orange-server-win64.zip` and run `orange_server.exe`.
 
+`orange_handshake [host] [port] [nickname]` (next to the server) connects
+the way the game client does and reports whether the server accepted the
+player, without starting the game. Use it to check ports and firewalls from
+another machine; the CI smoke tests run it too.
+
 Configuration lives in `config.yml` (name, ports, max players, resources).
 Resources are folders under `resources/` with a `resource.yml` and, for Lua
 resources, a `main.lua` - see `resources/example/` for a commented example

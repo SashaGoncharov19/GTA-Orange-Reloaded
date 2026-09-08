@@ -99,6 +99,7 @@ if(ORANGE_BUILD_SERVER)
   add_subdirectory(Server)
   add_subdirectory(lua-module)
   add_subdirectory(simple-module)
+  add_subdirectory(tools/handshake)
 
   # runtime files (sample config, Lua API bootstrap, example resource)
   install(DIRECTORY "${CMAKE_SOURCE_DIR}/runtime/server/" DESTINATION server COMPONENT server)
