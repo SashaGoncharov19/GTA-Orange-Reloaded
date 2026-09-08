@@ -17,10 +17,18 @@ yourself (see the README).
 ```bash
 tar xzf gta-orange-server-linux-x64.tar.gz
 cd server
-# lua-module.so links against the MySQL client library:
-sudo apt install libmysqlclient21      # Debian/Ubuntu
 ./orange_server
 ```
+
+`orange_server` must print `Lua module loaded` and `[example] resource
+started`; a line `Failed to load "lua-module.so"` means the resources cannot
+run. Since 2026-09-08 the Lua module needs no MySQL library to load: only a
+resource that opens a MySQL connection (`SQLEnv().mysql():connect(...)`)
+needs one, and it is loaded at that moment from whatever is installed
+(`libmysqlclient.so.21`/`.24`, `libmariadb.so.3`, ...; Debian: `sudo apt
+install libmariadb3`, Ubuntu: `sudo apt install libmysqlclient21`;
+`ORANGE_MYSQL_LIBRARY=/path/to/lib.so` forces a file). Without one the
+connection call returns an error message and everything else works.
 
 Ports: **7788/udp** (game) and **7789/tcp** (built-in HTTP server, used by
 resources via `OnHTTPReq`). Both are set in `config.yml`.
@@ -74,9 +82,12 @@ chmod +x gta-orange-proton.sh
 ./gta-orange-proton.sh
 ```
 
-The script compares `version.txt` of the package with the launcher version in
-`launcher.log` and warns when the binaries next to it are not the ones from
-the package.
+The script keeps the Linux side current: at every start it compares itself
+and `crossmap_from_fivem.py` with `linux-manifest.txt` of the release the
+launcher follows (nightly or stable) and replaces what differs, restarting
+itself when needed (`--no-self-update` or `ORANGE_SELF_UPDATE=0` turns this
+off; offline it just continues). `OrangeLauncher.exe` does the same for the
+Windows binaries and writes the new version into `version.txt`.
 
 ### The flow that works (GTA V 1.0.3889.0, verified 2026-09-08)
 

@@ -45,8 +45,9 @@ the server is published as a Docker image:
 ```bash
 # Linux
 tar xzf gta-orange-server-linux-x64.tar.gz && cd server
-sudo apt install libmysqlclient21     # needed by modules/lua-module.so
 ./orange_server                       # type "exit" to stop
+# MySQL from Lua (SQLEnv) needs a client library at run time, nothing else does:
+#   Debian: sudo apt install libmariadb3    Ubuntu: sudo apt install libmysqlclient21
 
 # Docker
 docker run --rm -it -p 7788:7788/udp -p 7789:7789 \
@@ -93,6 +94,8 @@ Nothing has to be downloaded by hand after the first install:
   release, `nightly` = latest `master` build), compares SHA-256 hashes with the
   local `orange-core.dll` / `OrangeLauncher.exe`, downloads what changed, verifies it
   and swaps the files in place (the launcher replaces itself and restarts).
+  `gta-orange-proton.sh` refreshes itself and `crossmap_from_fivem.py` from
+  the same release (`linux-manifest.txt`).
   A build follows the channel it came from (a nightly client tracks the
   `nightly` pre-release, a release tracks the stable releases) and never
   switches channels on its own; to move an installation run

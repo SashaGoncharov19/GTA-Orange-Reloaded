@@ -92,6 +92,29 @@ jobs:
           path: gta-orange-server-linux-x64.tar.gz
           if-no-files-found: error
 
+      # The Linux side of the client package: gta-orange-proton.sh refreshes
+      # itself and crossmap_from_fivem.py from these release assets (the
+      # launcher's auto-updater only handles the Windows binaries).
+      - name: Linux-side client files + manifest
+        run: |
+          mkdir linux-files
+          cp tools/proton/gta-orange-proton.sh tools/natives/crossmap_from_fivem.py linux-files/
+          cd linux-files
+          {
+            echo "# GTA:Orange Linux-side client files; gta-orange-proton.sh keeps itself current from this list"
+            echo "version $ORANGE_VERSION"
+            for f in gta-orange-proton.sh crossmap_from_fivem.py; do
+              echo "file $f $(sha256sum "$f" | cut -d' ' -f1) $(stat -c %s "$f")"
+            done
+          } > linux-manifest.txt
+          cat linux-manifest.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gta-orange-linux-files
+          path: linux-files/*
+          if-no-files-found: error
+
       - uses: actions/upload-artifact@v4
         with:
           name: gta-orange-server-version
@@ -272,6 +295,7 @@ jobs:
           * \`gta-orange-server-win64.zip\` - dedicated server for Windows
           * \`gta-orange-client-win64.zip\` - game client (OrangeLauncher.exe + orange-core.dll) + Proton helper script
           * \`client-manifest.txt\`, \`orange-core.dll\`, \`OrangeLauncher.exe\`, \`server-version.txt\` - used by the auto-updater (OrangeLauncher.exe, update-server.sh/.ps1); \`Launcher.exe\` is the same binary under the old name, kept for installs that have not switched yet
+          * \`linux-manifest.txt\`, \`gta-orange-proton.sh\`, \`crossmap_from_fivem.py\` - the Linux side of the client, refreshed by gta-orange-proton.sh itself
 
           See docs/LINUX_PROTON.md for Linux/Proton instructions."
           if gh release view nightly >/dev/null 2>&1; then

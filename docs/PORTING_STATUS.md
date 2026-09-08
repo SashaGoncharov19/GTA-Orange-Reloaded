@@ -132,14 +132,19 @@ Tick and script id hooks pass everything through).
    pointed at a hardcoded "beta-test server" (now: the address is typed in
    the browser or with `/connect host:port`, remembered in `config.xml`,
    and every connection step is logged as `Network: ...`).
-3. **The first connected session.** Run `orange_server` (Linux build) next
-   to the game and connect to `127.0.0.1:7788`. Expected on 3889: the
-   server accepts the player and the `example` resource teleports it to its
-   spawn, creates vehicles, a blip and a marker; remote players appear as
-   peds but move by teleport-interpolation only (`CNetworkPlayer::AssignTask`
-   is refused off the reference build); the local player's on-foot data is
-   read through natives where the 2017 structure reads were replaced, and
-   the remaining structure reads (aim, tasks) are wrong until item 1 is done.
+3. **The first connected session: done on 2026-09-09.** `orange_server`
+   (Linux build) next to the game, `Connect` to `127.0.0.1:7788`:
+   `Network: connection accepted`, `the server accepted the player`. Two
+   things kept the session empty and are fixed: the Lua module had not
+   loaded on the user's Debian (`libmysqlclient.so.21` missing, so no
+   resource ran; the MySQL client library is now loaded at run time and only
+   by a resource that uses SQL), and the client left the lobby camera only
+   when a resource positioned the player (now on acceptance). Still expected
+   on 3889: the `example` resource teleports the player to its spawn,
+   creates vehicles, a blip and a marker; remote players appear as peds but
+   move by teleport-interpolation only (`CNetworkPlayer::AssignTask` is
+   refused off the reference build), and the remaining 2017 structure reads
+   (aim, tasks, `CPed` writes for remote peds) are wrong until item 1 is done.
 4. `ReplayInterfaces`, `ViewportGame` and the gameplay patches
    (`GameProcessHooks`) have no patterns; only the debug pool overlay and the
    cosmetic patches depend on them.

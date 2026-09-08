@@ -26,6 +26,10 @@
 
 #include "luasql.h"
 
+#ifdef ORANGE_MYSQL_DLOPEN
+#include "MySQLDyn.h"
+#endif
+
 #define LUASQL_ENVIRONMENT_MYSQL "MySQL environment"
 #define LUASQL_CONNECTION_MYSQL "MySQL connection"
 #define LUASQL_CURSOR_MYSQL "MySQL cursor"
@@ -496,6 +500,14 @@ static int env_connect (lua_State *L) {
 	const int port = luaL_optinteger(L, 6, 0);
 	MYSQL *conn;
 	getenvironment(L); /* validade environment */
+
+#ifdef ORANGE_MYSQL_DLOPEN
+	{
+		std::string loadError;
+		if (!MySQLDynLoad(loadError))
+			return luasql_failmsg(L, "MySQL client library not available: ", loadError.c_str());
+	}
+#endif
 
 	/* Try to init the connection object. */
 	conn = mysql_init(NULL);
