@@ -49,7 +49,7 @@ anything is touched) each entry is resolved in this order:
 [Debug] offset ScrThreadCollection = 0xA1B2C3 (built-in pattern)
 [Error] offset CodeCave: UNRESOLVED (required) - no pattern known for this entry
 [Info] offset EscFreeze: unresolved (optional, skipped) - no pattern known for this entry
-[Info] Offsets: 90 total, 0 reference, 3 from offsets.ini, 14 by pattern, 0 disabled, 73 unresolved (15 required)
+[Info] Offsets: 92 total, 0 reference, 3 from offsets.ini, 23 by pattern, 0 disabled, 66 unresolved (0 required)
 ```
 
 An `orange.developer` file next to the DLL makes orange-core apply the patches
@@ -110,51 +110,49 @@ It produces `GTA5-<version>.dump.exe` next to the launcher with the section
 table rewritten so that file offsets equal RVAs: an address shown by the
 disassembler (with the image base set to 0, or minus the image base) is the
 value for `offsets.ini`. See also `docs/PORTING_STATUS.md` for the overall
-picture, including the route that avoids most offsets (ScriptHookV).
+picture and `docs/FINDINGS_1.0.3889.0.md` for the values found on 1.0.3889.0.
 
-Three groups of entries, from easy to hard:
+Which entries matter:
 
-### 1. Entries with a built-in pattern
+### 1. Required: the script engine
 
-The script-engine globals (`ScrThreadCollection`, `ActiveThreadTlsOffset`,
-`ScrThreadId`, `ScrThreadCount`, `RegistrationTable`, `ScriptHandlerMgr`,
-`GetScriptIdBlock`, `ScriptThreadTick`, `ScriptThreadKill`) carry patterns of
-the kind ScriptHookV-style hooks have used for years. They are marked
-*unverified* because they could not be checked against the reference build;
-if they do not match on your build, search public projects that hook the same
-globals (ScriptHookV-based hooks, FiveM's `rage-scripting-five`, RAGE
-Multiplayer's open parts) for current patterns and put them in `offsets.ini`.
+`ScrThreadCollection`, `ActiveThreadTlsOffset`, `ScrThreadId`,
+`ScrThreadCount`, `RegistrationTable`, `ScriptHandlerMgr`, `ScriptThreadTick`,
+`ScriptThreadKill`, `ScriptThreadInit` are the only required entries. Their
+patterns come from FiveM's `rage-scripting-five` (`scrEngine.cpp`,
+`scrThread.cpp`), one variant per family of game builds, and were verified on
+1.0.3889.0 (`docs/FINDINGS_1.0.3889.0.md`). When a new build breaks one of
+them, take the newest pattern from FiveM and convert the delta (FiveM points
+at the rel32, orange-core at the instruction).
 
-### 2. Functions that implement natives
+### 2. Optional with a fallback
 
-`ShutdownLoadingScreen`, `DoScreenFadeIn`, `HasScriptLoaded`,
-`ForceCleanupForAllThreadsWithThisName`, `TerminateAllScriptsWithThisName`,
-`GetEntityFromScriptHandle`: these are the C++ implementations behind
-well-known natives. Find the native's handler in the registration table (any
-public natives database gives you the hash for your build) and follow it to
-the implementation.
+* `LookAlive` (message pump, MinHook) or `LookAliveCall` (call site): the
+  per-frame hook. `StartupScript` (MinHook) or `GameStateChangeCall` (call
+  site) or the `World` ped poll: the "game ready" trigger. One of each is
+  needed; `PreLoadPatches` logs which one is in use.
+* `ScriptIdCompare`: entity ownership checks answer "same script" (FiveM).
+* `SwapChain`: without it Present is hooked through a temporary swap chain.
+  `WindowCreateCall`: without it the window handle comes from the swap chain.
+* `ViewportGame`: without it world-to-screen goes through the game's own
+  native and the screen size through ImGui.
+* `GetEntityAddressCall`: `GetEntityFromScriptHandle` is used instead.
+* `ShutdownLoadingScreen`, `DoScreenFadeIn`, `HasScriptLoaded`,
+  `TerminateAllScriptsWithThisName`, `ForceCleanupForAllThreadsWithThisName`:
+  the reference build's by-name script shutdown; other builds freeze the
+  stock scripts through the thread tick hook and use natives.
+* `CodeCave`: without it a page within 2 GB of GTA5.exe is allocated.
 
 ### 3. Patches identified only by their reference RVA
 
 Most `GameProcessHooks` entries (`DisableNorthBlip`, `CrashLoadModelsTooQuickly`,
 `RuntimeExecutableImportsCheck`, `DisablePopulation*`, ...) and the
-`UnknownPatch_*` group have no pattern. The names follow the patch lists that
-circulated in early GTA V multiplayer projects, so the same names (and, often,
-current patterns) can be found in those projects. Work through them one by
-one:
-
-* start with everything **required**: the two `ForceToSingle` functions, the
-  `CodeCave` (any 48 bytes of unused executable memory, e.g. padding at the
-  end of `.text`), the four `*Call` sites, `InitHUD`, `CanLangChange`, the
-  RAGE globals (`World`, `ViewportGame`, `ReplayInterfaces`, `SwapChain`,
-  `GetEntityAddressCall`);
-* leave optional entries unresolved at first, then add them when the base
-  works.
-
-Compare with the reference build where you can: the comments in the template
-say what is patched (`5 bytes nopped`, `function start replaced by ret`,
-`rel32 at +3`), and a diff of the surrounding code between builds is usually
-enough to find the new location.
+`UnknownPatch_*` group have no pattern and simply stay off on other builds.
+The names follow the patch lists that circulated in early GTA V multiplayer
+projects, so the same names (and, often, current patterns) can be found in
+those projects. The comments in the template say what is patched (`5 bytes
+nopped`, `function start replaced by ret`, `rel32 at +3`), and a diff of the
+surrounding code between builds is usually enough to find the new location.
 
 ## What offsets do not cover
 
@@ -164,13 +162,14 @@ Updating the addresses is necessary but not sufficient for a modern build:
   canonical hash; `Core/NativeTable.cpp` translates it to the running build
   (built-in table for the reference build, `natives-<version>.txt` next to
   the DLL for others) and walks the plain or obfuscated registration table.
-  Producing that file for a new build is described in
-  `docs/PORTING_STATUS.md`.
+  The launcher generates that file from FiveM's public universal crossmap
+  (`docs/PORTING_STATUS.md`, section 5).
 * **Structure layouts.** `GTA/CRage.h`, `Core/scrThread.h`, the task
   serialisation and the sync code read game structures by fixed member
   offsets. Those move as well.
-* **Script threads.** `Core/scrThread.cpp` mirrors the reference build's
-  `scrThread` layout and virtual table.
+* **Script threads.** `Core/scrThread.cpp` reads the script handler position
+  from the game's Kill code and reserves a large zeroed tail, so the thread
+  object works on the reference build and on 1.0.2699+ alike.
 
 Each of those is a separate reverse-engineering task; `client.log` and the
 `orange.developer` mode are there to work through them incrementally.

@@ -5,6 +5,7 @@
 #include "Launcher.h"
 #include "Injector.h"
 #include "Updater.h"
+#include "NativesCrossmap.h"
 #include "UpdateManifest.h"
 #include "LauncherLog.h"
 #include <thread>
@@ -450,6 +451,16 @@ void LaunchGame()
 				TerminateProcess(GetCurrentProcess(), 0);
 			}
 			Fail((L"Dumping GTA5.exe failed:\n" + FromUtf8(error.c_str())).c_str());
+		}
+		// The natives crossmap for this game version (natives-<version>.txt) is
+		// generated from FiveM's public table when it is missing; without it
+		// orange-core cannot call natives on a build newer than the reference one.
+		{
+			std::wstring gameExe = Injector::Get().FindGameExePath();
+			std::wstring gameVersion = gameExe.empty() ? L"" : Injector::GameFileVersion(gameExe);
+			LauncherLog(L"game executable: " + (gameExe.empty() ? std::wstring(L"(not found)") : gameExe) + L", version " + (gameVersion.empty() ? std::wstring(L"unknown") : gameVersion));
+			SetSplashStatus(L"Checking the natives crossmap...");
+			EnsureNativesCrossmap(orangeDir, gameVersion);
 		}
 		SetSplashStatus(L"Injecting orange-core.dll...");
 		// A game we attach to (--inject) has been running for a while and is

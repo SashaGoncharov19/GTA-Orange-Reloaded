@@ -52,6 +52,10 @@ public:
 	// Removes Launcher.exe.old left behind by a self-update.
 	static void CleanupAfterRestart(const std::wstring& installDir);
 
+	// One-off HTTPS download (used for the natives crossmap). Returns false
+	// with a description in `error`.
+	static bool DownloadUrl(const std::wstring& url, std::vector<char>& out, std::string& error);
+
 private:
 	std::wstring BaseUrl() const;
 	bool HttpGet(const std::wstring& url, std::vector<char>& out, const std::wstring& what, float progressFrom, float progressTo);

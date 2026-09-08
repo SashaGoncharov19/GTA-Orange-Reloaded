@@ -10,9 +10,49 @@ CGraphics * CGraphics::Get()
 }
 
 
+bool CGraphics::ScreenSize(float & width, float & height)
+{
+	auto viewPortGame = GTA::CViewportGame::Get();
+	if (viewPortGame && viewPortGame->Width > 0 && viewPortGame->Height > 0)
+	{
+		width = (float)viewPortGame->Width;
+		height = (float)viewPortGame->Height;
+		return true;
+	}
+	ImVec2 display = ImGui::GetIO().DisplaySize;
+	if (display.x > 0.f && display.y > 0.f)
+	{
+		width = display.x;
+		height = display.y;
+		return true;
+	}
+	RECT client;
+	if (CGlobals::Get().gtaHwnd && GetClientRect(CGlobals::Get().gtaHwnd, &client) && client.right > client.left && client.bottom > client.top)
+	{
+		width = (float)(client.right - client.left);
+		height = (float)(client.bottom - client.top);
+		return true;
+	}
+	width = 1280.f;
+	height = 720.f;
+	return false;
+}
+
 bool CGraphics::WorldToScreen(CVector3 pos, CVector3 &out)
 {
 	auto viewPortGame = GTA::CViewportGame::Get();
+	if (!viewPortGame)
+	{
+		// No viewport structure on this build: the game projects for us.
+		// Natives are only valid from the script thread (PreRender paths).
+		float x = 0.f, y = 0.f;
+		if (!GRAPHICS::_WORLD3D_TO_SCREEN2D(pos.fX, pos.fY, pos.fZ, &x, &y))
+			return false;
+		out.fX = x;
+		out.fY = y;
+		out.fZ = 1.f;
+		return true;
+	}
 	auto matrix = viewPortGame->ViewPort;
 	_D3DMATRIX transposed;
 	transposed._11 = matrix._11;
@@ -67,10 +107,12 @@ bool CGraphics::WorldToScreen(CVector3 pos, CVector3 &out)
 void CGraphics::Draw3DText(std::string text, float x, float y, float z, color_t color)
 {
 	CVector3 screenPos;
-	WorldToScreen(CVector3(x, y, z), screenPos);
-	auto viewPortGame = GTA::CViewportGame::Get();
-	x = screenPos.fX * viewPortGame->Width;
-	y = screenPos.fY * viewPortGame->Height;
+	if (!WorldToScreen(CVector3(x, y, z), screenPos))
+		return;
+	float screenW = 0.f, screenH = 0.f;
+	ScreenSize(screenW, screenH);
+	x = screenPos.fX * screenW;
+	y = screenPos.fY * screenH;
 	ImVec2 textSize = CGlobals::Get().chatFont->CalcTextSizeA(20.f, 1000.f, 1000.f, text.c_str());
 	ImGui::GetWindowDrawList()->AddText(CGlobals::Get().chatFont, 20.f, ImVec2(x - textSize.x / 2 - 1, y - 1), ImColor(0,0,0,255), text.c_str());
 	ImGui::GetWindowDrawList()->AddText(CGlobals::Get().chatFont, 20.f, ImVec2(x - textSize.x / 2 + 1, y + 1), ImColor(0, 0, 0, 255), text.c_str());
@@ -84,12 +126,14 @@ void CGraphics::Draw3DProgressBar(color_t bgColor, color_t frontColor, float wid
 	if (value > 1.f)
 		value = 1.f;
 	CVector3 screenPos;
-	WorldToScreen(CVector3(x, y, z), screenPos);
-	auto viewPortGame = GTA::CViewportGame::Get();
+	if (!WorldToScreen(CVector3(x, y, z), screenPos))
+		return;
+	float screenW = 0.f, screenH = 0.f;
+	ScreenSize(screenW, screenH);
 	DWORD colorOut = ImColor(bgColor.red, bgColor.green, bgColor.blue, bgColor.alpha);
 	DWORD colorIn = ImColor(frontColor.red, frontColor.green, frontColor.blue, frontColor.alpha);
-	x = screenPos.fX * viewPortGame->Width;
-	y = screenPos.fY * viewPortGame->Height + 24;
+	x = screenPos.fX * screenW;
+	y = screenPos.fY * screenH + 24;
 	width *= 800;
 	height *= 600;
 	x -= (width / 2);

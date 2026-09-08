@@ -375,3 +375,17 @@ void Updater::CleanupAfterRestart(const std::wstring& installDir)
 		Sleep(100);   // the previous launcher instance may still be exiting
 	}
 }
+
+#ifndef ORANGE_VERSION
+#define ORANGE_VERSION "dev"
+#endif
+
+bool Updater::DownloadUrl(const std::wstring& url, std::vector<char>& out, std::string& error)
+{
+	UpdaterSettings settings;
+	Updater downloader(L"", ORANGE_VERSION, settings, ProgressFn());
+	if (downloader.HttpGet(url, out, L"Downloading...", 0.f, 0.f))
+		return true;
+	error = downloader.m_error;
+	return false;
+}

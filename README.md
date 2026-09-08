@@ -103,13 +103,15 @@ Nothing has to be downloaded by hand after the first install:
   untouched. Add `--channel nightly` / `-Channel nightly` for nightly builds.
   Docker users just pull the new image tag.
 
-> **Important:** `orange-core.dll` hooks `GTA5.exe` at ~90 addresses whose
-> built-in values belong to the **January 2017** game build. On any other build
-> it detects the mismatch, stays inactive instead of crashing the game, and
-> writes `offsets-<version>.generated.ini` next to itself listing every address
-> it needs. The values for a newer build go into `offsets.ini` - see
-> [docs/UPDATING_OFFSETS.md](docs/UPDATING_OFFSETS.md) and
-> [Known limitations](#known-limitations).
+> **Game builds:** `orange-core.dll` hooks `GTA5.exe` at ~90 addresses. Only
+> nine of them (the script engine) are required and they are found by byte
+> patterns, verified on GTA V **1.0.3889.0**; everything else is optional with
+> a fallback. On a build where a required entry does not resolve the DLL
+> stays inactive instead of crashing the game and writes
+> `offsets-<version>.generated.ini` next to itself. Natives are translated
+> through `natives-<version>.txt`, which `Launcher.exe` generates from FiveM's
+> public crossmap on first start. See [docs/PORTING_STATUS.md](docs/PORTING_STATUS.md)
+> and [docs/UPDATING_OFFSETS.md](docs/UPDATING_OFFSETS.md).
 
 ## Building from source
 
@@ -166,20 +168,23 @@ To publish a release: `git tag v0.3.0 && git push origin v0.3.0`.
 
 ## Porting to a current GTA V build
 
-The status after the first run on GTA V 1.0.3889.0, the three layers a port
-needs (addresses, native hashes, structures), the recommended route and the
-list of what to find are in [docs/PORTING_STATUS.md](docs/PORTING_STATUS.md).
+The state of the 1.0.3889.0 port (hooks the FiveM way, build-aware script
+thread, natives crossmap generation), what the first live run should show
+and what is still missing (structure layouts) are in
+[docs/PORTING_STATUS.md](docs/PORTING_STATUS.md); the addresses and
+structures found in the game dump are in
+[docs/FINDINGS_1.0.3889.0.md](docs/FINDINGS_1.0.3889.0.md).
 `Launcher.exe --dump-game` writes the unpacked game image for a disassembler.
 
 ## Known limitations
 
-* **Game build:** the built-in offsets target the GTA V build of January
-  2017. All of them live in one table (`orange-core/GameOffsets.cpp`) and can
-  be overridden per game version through `offsets.ini` (RVA, `disabled`, or a
-  byte pattern); the script-engine entries already carry patterns. Until the
-  entries for a current build are filled in, the DLL refuses to patch it. The
-  workflow is described in [docs/UPDATING_OFFSETS.md](docs/UPDATING_OFFSETS.md).
-  Native hashes and structure layouts are a separate, still open task.
+* **Game build:** the addresses live in one table
+  (`orange-core/GameOffsets.cpp`), found by byte patterns and overridable per
+  game version through `offsets.ini` (RVA, `disabled`, or a byte pattern).
+  1.0.3889.0 resolves everything required; the structure layouts used by the
+  synchronisation code (`GTA/CRage.h` and friends) are still the 2017 ones
+  and are the open part of the port. The workflow is described in
+  [docs/UPDATING_OFFSETS.md](docs/UPDATING_OFFSETS.md).
 * **Scaleform:** the DrawText experiment needs Autodesk's GFx 4.0 SDK
   libraries, which are not redistributable; it is disabled by default.
 * **MySQL on Windows:** the Windows lua-module is built without LuaSQL/MySQL

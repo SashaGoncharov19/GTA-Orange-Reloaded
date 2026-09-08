@@ -209,10 +209,6 @@ enum eGameState {
 	GameStateLoadingSP_MP = 6
 };
 
-typedef bool(*LookAlive)();
-typedef bool(*GameStateChange_)();
-static LookAlive g_origLookAlive;
-static GameStateChange_ g_gameStateChange;
 
 struct Color
 {

@@ -496,3 +496,25 @@ bool Injector::DumpGame(const std::wstring& outputDir, std::wstring& writtenPath
 Injector::~Injector()
 {
 }
+
+std::wstring Injector::GameFileVersion(const std::wstring& exePath)
+{
+	return FileVersionOf(exePath);
+}
+
+std::wstring Injector::FindGameExePath()
+{
+	int pid = FindProcess(PROCESS_NAME);
+	if (pid == -1)
+		return L"";
+	HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!process)
+		return L"";
+	wchar_t path[MAX_PATH * 2] = { 0 };
+	DWORD size = MAX_PATH * 2;
+	std::wstring result;
+	if (QueryFullProcessImageNameW(process, 0, path, &size))
+		result = path;
+	CloseHandle(process);
+	return result;
+}

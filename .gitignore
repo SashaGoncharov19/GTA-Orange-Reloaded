@@ -279,3 +279,9 @@ CMakeCache.txt
 /.cache/
 compile_commands.json
 *.tar.gz
+
+# Generated next to the client at run time (docs/PORTING_STATUS.md): never committed
+natives-*.*.*.*.txt
+natives-*.registered.txt
+offsets-*.generated.ini
+GTA5-*.dump.exe

@@ -14,6 +14,21 @@ std::string GetModuleDir()
 	return path.substr(0, path.find_last_of("\\/"));
 }
 
+static bool FileExists(const std::string& path)
+{
+	DWORD attributes = GetFileAttributesA(path.c_str());
+	return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+// The MinHook based hooks suspend the other threads while they are written,
+// which must not happen under the loader lock: they are installed from here,
+// right after DllMain has returned.
+static DWORD WINAPI InstallHooksThread(LPVOID)
+{
+	InstallGameHooks();
+	return 0;
+}
+
 // On a build other than the reference one, write the natives the game
 // registered (build hash + handler RVA) next to the DLL: the raw material
 // for natives-<version>.txt (docs/PORTING_STATUS.md). Runs on its own thread
@@ -24,6 +39,15 @@ static DWORD WINAPI DumpNativesThread(LPVOID)
 	std::string path = CGlobals::Get().orangePath + "\\natives-" + GameOffsets::GameVersion() + ".registered.txt";
 	NativeTable::DumpRegistered(path);
 	return 0;
+}
+
+static void StartThread(LPTHREAD_START_ROUTINE routine, const char* what)
+{
+	HANDLE thread = CreateThread(NULL, 0, routine, NULL, 0, NULL);
+	if (thread)
+		CloseHandle(thread);
+	else
+		log_error << "CreateThread failed for " << what << " (error " << GetLastError() << ")" << std::endl;
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
@@ -39,26 +63,24 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 		CGlobals::Get().orangePath = GetModuleDir();
 
 		// An empty "orange.developer" file next to the DLL enables developer
-		// features (direct connect UI, relaxed game build check).
-		std::fstream isDev(CGlobals::Get().orangePath + "/orange.developer");
-		if (isDev.good())
-			CGlobals::Get().isDeveloper = true;
-		isDev.close();
+		// features (direct connect UI, relaxed game build check);
+		// "orange.storymode" lets the game's own scripts keep running.
+		CGlobals::Get().isDeveloper = FileExists(CGlobals::Get().orangePath + "\\orange.developer");
+		CGlobals::Get().storyMode = FileExists(CGlobals::Get().orangePath + "\\orange.storymode");
 
 		my_ostream::SetLogFile(CGlobals::Get().orangePath + "/client.log");
 #ifndef ORANGE_VERSION
 #define ORANGE_VERSION "dev"
 #endif
-		log_info << "orange-core " << ORANGE_VERSION << " loaded from " << CGlobals::Get().orangePath << std::endl;
+		log_info << "orange-core " << ORANGE_VERSION << " loaded from " << CGlobals::Get().orangePath
+			<< (CGlobals::Get().isDeveloper ? " (developer mode)" : "") << (CGlobals::Get().storyMode ? " (story mode)" : "") << std::endl;
 
 		bool patched = PreLoadPatches();
 		if (GameOffsets::IsInitialized() && !GameOffsets::IsReferenceBuild())
-		{
-			HANDLE thread = CreateThread(NULL, 0, DumpNativesThread, NULL, 0, NULL);
-			if (thread)
-				CloseHandle(thread);
-		}
-		if (!patched)
+			StartThread(DumpNativesThread, "the natives dump");
+		if (patched)
+			StartThread(InstallHooksThread, "the hook installation");
+		else
 		{
 			log_error << "Game build check failed, GTA:Orange stays inactive" << std::endl;
 			std::string message =

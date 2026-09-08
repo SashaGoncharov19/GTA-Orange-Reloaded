@@ -118,10 +118,15 @@ void CNetwork3DText::PreRender()
 		text->fontSize = text->rawFontSize * k;
 		ImVec2 textSize = CGlobals::Get().chatFont->CalcTextSizeA(text->fontSize, 1000.f, 0.f, text->text.c_str());
 		CVector3 screenPos;
-		CGraphics::Get()->WorldToScreen(CVector3(text->vecPos.fX, text->vecPos.fY, text->vecPos.fZ), screenPos);
-		auto viewPortGame = GTA::CViewportGame::Get();
-		text->scrPos.fX = (screenPos.fX * viewPortGame->Width) - textSize.x / 2;
-		text->scrPos.fY = (screenPos.fY * viewPortGame->Height) - textSize.y / 2;
+		if (!CGraphics::Get()->WorldToScreen(CVector3(text->vecPos.fX, text->vecPos.fY, text->vecPos.fZ), screenPos))
+		{
+			text->IsVisible = false;
+			continue;
+		}
+		float screenW = 0.f, screenH = 0.f;
+		CGraphics::Get()->ScreenSize(screenW, screenH);
+		text->scrPos.fX = (screenPos.fX * screenW) - textSize.x / 2;
+		text->scrPos.fY = (screenPos.fY * screenH) - textSize.y / 2;
 	}
 }
 

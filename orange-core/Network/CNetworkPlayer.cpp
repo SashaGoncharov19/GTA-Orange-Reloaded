@@ -592,10 +592,15 @@ void CNetworkPlayer::MakeTag()
 		tag.k = 1.3f - tag.distance / 100;
 
 		CVector3 screenPos;
-		CGraphics::Get()->WorldToScreen(CVector3(vecCurPos->fX, vecCurPos->fY, vecCurPos->fZ + 1.1f * tag.k + (tag.distance * 0.04f)), screenPos);
-		auto viewPortGame = GTA::CViewportGame::Get();
-		tag.x = screenPos.fX * viewPortGame->Width;
-		tag.y = screenPos.fY * viewPortGame->Height;
+		if (!CGraphics::Get()->WorldToScreen(CVector3(vecCurPos->fX, vecCurPos->fY, vecCurPos->fZ + 1.1f * tag.k + (tag.distance * 0.04f)), screenPos))
+		{
+			tag.bVisible = false;
+			return;
+		}
+		float screenW = 0.f, screenH = 0.f;
+		CGraphics::Get()->ScreenSize(screenW, screenH);
+		tag.x = screenPos.fX * screenW;
+		tag.y = screenPos.fY * screenH;
 
 		tag.bVisible = true;
 	}

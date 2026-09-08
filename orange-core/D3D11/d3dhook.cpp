@@ -273,42 +273,45 @@ charTableItem charTable[] = {
 
 typedef HRESULT(__stdcall* D3D11Present_t) (IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags);
 D3D11Present_t pD3D11_Present = NULL;
+static bool g_renderInitialized = false;
+static bool g_renderInitFailed = false;
 
-HRESULT __stdcall D3D11_Present_Hook(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags)
-{
-	D3DHook::Render();
-	return pD3D11_Present(pSwapChain, SyncInterval, Flags);
-}
+#ifndef D3D11_SDK_VERSION
+#define D3D11_SDK_VERSION 7
+#endif
 
-bool D3DHook::HookD3D11()
+// Creates the ImGui device objects, the fonts and the render target for the
+// swap chain the game presents with. Runs once: right away when the game's
+// swap chain pointer is known (SwapChain offset), otherwise inside the first
+// Present call, which also tells us the game window.
+static void InitializeRendering(IDXGISwapChain* swapchain)
 {
-	LPVOID swapChainGlobal = GameMem("SwapChain").getOffset();
-	IDXGISwapChain1* swapchain = swapChainGlobal ? *(IDXGISwapChain1**)swapChainGlobal : nullptr;
-	if (!swapchain)
+	if (g_renderInitialized || g_renderInitFailed || !swapchain)
+		return;
+	ID3D11Device* device = nullptr;
+	if (FAILED(swapchain->GetDevice(__uuidof(ID3D11Device), (void**)&device)) || !device)
 	{
-		log_error << "D3DHook: swap chain pointer unresolved or NULL, UI rendering disabled" << std::endl;
-		return false;
+		g_renderInitFailed = true;
+		log_error << "D3DHook: IDXGISwapChain::GetDevice failed, UI rendering disabled" << std::endl;
+		return;
 	}
-	CGlobals::Get().d3dSwapChain = swapchain;
-	ID3D11Device* device;
-	swapchain->GetDevice(__uuidof(ID3D11Device), (void**)&device);
-	ID3D11DeviceContext* device_context;
+	ID3D11DeviceContext* device_context = nullptr;
 	device->GetImmediateContext(&device_context);
 
-	IDXGIDevice * pDXGIDevice;
-	device->QueryInterface(__uuidof(IDXGIDevice), (void **)&pDXGIDevice);
-	IDXGIAdapter * pDXGIAdapter;
-	pDXGIDevice->GetAdapter(&pDXGIAdapter);
-	DXGI_ADAPTER_DESC adapterDesc;
-	pDXGIAdapter->GetDesc(&adapterDesc);
-	
+	DXGI_SWAP_CHAIN_DESC sd;
+	ZeroMemory(&sd, sizeof(sd));
+	if (SUCCEEDED(swapchain->GetDesc(&sd)) && sd.OutputWindow && !CGlobals::Get().gtaHwnd)
+	{
+		CGlobals::Get().gtaHwnd = sd.OutputWindow;
+		log_info << "D3DHook: game window taken from the swap chain" << std::endl;
+	}
+
+	CGlobals::Get().d3dSwapChain = swapchain;
 	CGlobals::Get().d3dDevice = device;
 	CGlobals::Get().d3dDeviceContext = device_context;
-	auto gui_result = ImGui_ImplDX11_Init(CGlobals::Get().gtaHwnd, device, device_context);
+	ImGui_ImplDX11_Init(CGlobals::Get().gtaHwnd, device, device_context);
 	ImGuiIO& io = ImGui::GetIO();
 	io.Fonts->AddFontDefault();
-	/*char windowsPath[MAX_PATH];
-	GetWindowsDirectoryA(windowsPath, MAX_PATH);*/
 
 	ImFontConfig config;
 	config.MergeMode = false;
@@ -330,9 +333,118 @@ bool D3DHook::HookD3D11()
 		CGlobals::Get().tagFont->AddRemapChar(charTable[i].old_, charTable[i].new_);
 
 	CreateRenderTarget();
-	DWORD64* pD3D11_SwapChainVTable = (DWORD64*)swapchain;
-	pD3D11_SwapChainVTable = (DWORD64*)pD3D11_SwapChainVTable[0];
-	Memory::Init();
-	Memory::HookFunction((DWORD64)pD3D11_SwapChainVTable[8], &D3D11_Present_Hook, (void**)&pD3D11_Present);
+	g_renderInitialized = true;
+	log_info << "D3DHook: rendering initialised (" << sd.BufferDesc.Width << "x" << sd.BufferDesc.Height << ")" << std::endl;
+	AttachInputHook();
+}
+
+HRESULT __stdcall D3D11_Present_Hook(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags)
+{
+	if (!g_renderInitialized)
+		InitializeRendering(pSwapChain);
+	if (g_renderInitialized)
+		D3DHook::Render();
+	return pD3D11_Present(pSwapChain, SyncInterval, Flags);
+}
+
+// The address of IDXGISwapChain::Present is the same for every swap chain
+// the DXGI implementation creates, so a throw-away device + swap chain on a
+// hidden window gives the vtable entry to hook without knowing where the
+// game keeps its own swap chain.
+static void* PresentFromTemporarySwapChain()
+{
+	HMODULE d3d11 = LoadLibraryW(L"d3d11.dll");
+	if (!d3d11)
+	{
+		log_error << "D3DHook: d3d11.dll not loaded" << std::endl;
+		return nullptr;
+	}
+	PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN create = (PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN)GetProcAddress(d3d11, "D3D11CreateDeviceAndSwapChain");
+	if (!create)
+	{
+		log_error << "D3DHook: D3D11CreateDeviceAndSwapChain not found" << std::endl;
+		return nullptr;
+	}
+
+	WNDCLASSEXW wc;
+	ZeroMemory(&wc, sizeof(wc));
+	wc.cbSize = sizeof(wc);
+	wc.lpfnWndProc = DefWindowProcW;
+	wc.hInstance = GetModuleHandleW(NULL);
+	wc.lpszClassName = L"GTAOrangeSwapChainProbe";
+	RegisterClassExW(&wc);
+	HWND window = CreateWindowExW(0, wc.lpszClassName, L"", WS_OVERLAPPEDWINDOW, 0, 0, 64, 64, NULL, NULL, wc.hInstance, NULL);
+	if (!window)
+	{
+		log_error << "D3DHook: probe window could not be created (error " << GetLastError() << ")" << std::endl;
+		UnregisterClassW(wc.lpszClassName, wc.hInstance);
+		return nullptr;
+	}
+
+	DXGI_SWAP_CHAIN_DESC sd;
+	ZeroMemory(&sd, sizeof(sd));
+	sd.BufferCount = 1;
+	sd.BufferDesc.Width = 64;
+	sd.BufferDesc.Height = 64;
+	sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	sd.BufferDesc.RefreshRate.Numerator = 60;
+	sd.BufferDesc.RefreshRate.Denominator = 1;
+	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	sd.OutputWindow = window;
+	sd.SampleDesc.Count = 1;
+	sd.Windowed = TRUE;
+	sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+
+	D3D_FEATURE_LEVEL levels[] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0 };
+	D3D_FEATURE_LEVEL obtained;
+	IDXGISwapChain* swapchain = nullptr;
+	ID3D11Device* device = nullptr;
+	ID3D11DeviceContext* context = nullptr;
+	HRESULT hr = create(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0, levels, 3, D3D11_SDK_VERSION, &sd, &swapchain, &device, &obtained, &context);
+	void* present = nullptr;
+	if (SUCCEEDED(hr) && swapchain)
+		present = (*(void***)swapchain)[8];
+	else
+		log_error << "D3DHook: D3D11CreateDeviceAndSwapChain failed (0x" << std::hex << (unsigned long)hr << std::dec << ")" << std::endl;
+	if (context)
+		context->Release();
+	if (device)
+		device->Release();
+	if (swapchain)
+		swapchain->Release();
+	DestroyWindow(window);
+	UnregisterClassW(wc.lpszClassName, wc.hInstance);
+	return present;
+}
+
+bool D3DHook::HookD3D11()
+{
+	static bool hooked = false;
+	if (hooked)
+		return true;
+
+	LPVOID swapChainGlobal = GameMem("SwapChain").getOffset();
+	IDXGISwapChain* swapchain = swapChainGlobal ? *(IDXGISwapChain**)swapChainGlobal : nullptr;
+	void* present = nullptr;
+	if (swapchain)
+	{
+		present = (*(void***)swapchain)[8];
+		log_info << "D3DHook: Present taken from the game's swap chain (SwapChain offset)" << std::endl;
+	}
+	else
+	{
+		log_info << "D3DHook: SwapChain offset unresolved" << (swapChainGlobal ? " or NULL" : "") << ", probing DXGI for IDXGISwapChain::Present" << std::endl;
+		present = PresentFromTemporarySwapChain();
+	}
+	if (!present)
+	{
+		log_error << "D3DHook: no Present address, UI rendering disabled" << std::endl;
+		return false;
+	}
+	if (!HookAddress(present, (void*)&D3D11_Present_Hook, (void**)&pD3D11_Present, "IDXGISwapChain::Present"))
+		return false;
+	hooked = true;
+	if (swapchain)
+		InitializeRendering(swapchain);
 	return true;
 }
