@@ -59,6 +59,41 @@ void Injector::RunSteam()
 	ShellExecute(NULL, NULL, L"steam://run/271590", NULL, NULL, SW_SHOW);
 }
 
+// True when `moduleName` is already among the modules of the process. Loading
+// a DLL a second time is a no-op: LoadLibrary hands back the module that is
+// already there and never calls DllMain again, so nothing at all happens and
+// client.log stays as it was. Worth saying out loud rather than reporting a
+// successful injection that did nothing.
+static bool ProcessHasModule(int pid, const std::wstring& moduleName)
+{
+	bool found = false;
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid);
+	if (snapshot == INVALID_HANDLE_VALUE)
+		return false;
+	MODULEENTRY32 module;
+	module.dwSize = sizeof(module);
+	if (Module32First(snapshot, &module))
+	{
+		do {
+			if (_wcsicmp(moduleName.c_str(), module.szModule) == 0)
+			{
+				found = true;
+				break;
+			}
+		} while (Module32Next(snapshot, &module));
+	}
+	CloseHandle(snapshot);
+	return found;
+}
+
+// "orange-core.dll" from "Z:\\home\\...\\orange-core.dll".
+static std::wstring FileNameOf(const std::string& path)
+{
+	std::wstring wide = Utils::MultibyteToUnicode(path);
+	size_t slash = wide.find_last_of(L"\\/");
+	return slash == std::wstring::npos ? wide : wide.substr(slash + 1);
+}
+
 bool Injector::InjectAll(bool waitForUnpack, int unpackTimeoutSeconds)
 {
 	Sleep(100);
@@ -87,6 +122,13 @@ bool Injector::InjectAll(bool waitForUnpack, int unpackTimeoutSeconds)
 	for (const std::string& lib : libs)
 	{
 		std::string error;
+		if (ProcessHasModule(pid, FileNameOf(lib)))
+		{
+			LauncherLog("inject: " + lib + " is ALREADY loaded in this GTA5.exe (pid " + std::to_string(pid)
+				+ "). Loading it again does nothing - Windows returns the module that is already there and does not run its entry point, "
+				"so client.log will not get a new run. Restart GTA V to load this build of orange-core.dll.");
+			continue;
+		}
 		LauncherLog("inject: loading " + lib);
 		if (!Inject(pid, lib, error))
 		{

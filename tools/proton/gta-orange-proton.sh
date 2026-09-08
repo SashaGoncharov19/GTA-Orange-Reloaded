@@ -118,24 +118,54 @@ summarize_update() {
 }
 
 # Reads client.log and explains the outcome of the last injection.
+#
+# client.log is appended to, so it holds every run orange-core ever made in
+# this folder. Judging the whole file (or a blind tail of it) reports an old
+# failed run as the current state, so everything below looks at the last run
+# only: from the last "orange-core <version> loaded from ..." banner to the end.
 summarize_client_log() {
 	[ -f "$CLIENT_LOG" ] || { log "client.log was not written: orange-core.dll did not load inside GTA5.exe (see launcher.log)"; return; }
-	local version
-	version="$(grep -a 'Game version:' "$CLIENT_LOG" | tail -n 1 | sed -E 's/.*Game version: ([^,]+),.*/\1/')"
-	[ -n "$version" ] && log "GTA5.exe version seen by orange-core: $version"
-	if grep -aq 'Game patches applied' "$CLIENT_LOG" && [ "$(grep -ac 'Game patches applied' "$CLIENT_LOG")" -ge 1 ]; then
-		if tail -n 200 "$CLIENT_LOG" | grep -aq 'stays inactive'; then
-			:
-		else
-			log "orange-core is ACTIVE in the game (patches applied)."
-		fi
+
+	# The launcher says so when the DLL was already in the process: then the
+	# game was never re-entered and client.log below is from an earlier run.
+	if [ -f "$LAUNCHER_LOG" ] && tail -n 40 "$LAUNCHER_LOG" | grep -aq 'is ALREADY loaded'; then
+		log "This run injected nothing: orange-core.dll was already loaded in the running GTA5.exe."
+		log "         Windows hands back the module that is already there without running it again."
+		log "         Restart GTA V (not just this script) to load the current orange-core.dll."
 	fi
-	if tail -n 200 "$CLIENT_LOG" | grep -aq 'stays inactive'; then
+
+	local run
+	run="$(awk '/orange-core .* loaded from/ { block = "" } { block = block $0 "\n" } END { printf "%s", block }' "$CLIENT_LOG")"
+	[ -n "$run" ] || run="$(cat "$CLIENT_LOG")"
+
+	local version started
+	started="$(printf '%s' "$run" | grep -a 'loaded from' | tail -n 1 | sed -E 's/^\[([^]]*)\].*/\1/')"
+	version="$(printf '%s' "$run" | grep -a 'Game version:' | tail -n 1 | sed -E 's/.*Game version: ([^,]+),.*/\1/')"
+	[ -n "$started" ] && log "Last orange-core run: $started"
+	[ -n "$version" ] && log "GTA5.exe version seen by orange-core: $version"
+
+	if printf '%s' "$run" | grep -aq 'stays inactive'; then
 		log "orange-core stayed INACTIVE: this GTA V build is not supported by the built-in offsets."
 		local template
 		template="$(ls -t "$CLIENT_DIR"/offsets-*.generated.ini 2>/dev/null | head -n 1 || true)"
 		[ -n "$template" ] && log "A template with the missing offsets was written to: $template"
 		log "See docs/UPDATING_OFFSETS.md (in the repository) for how to fill in offsets.ini."
+		return
+	fi
+
+	printf '%s' "$run" | grep -aq 'Game patches applied' && log "orange-core is ACTIVE in the game (patches applied)."
+	printf '%s' "$run" | grep -aq 'Game hooks installed' && log "Hooks installed: $(printf '%s' "$run" | grep -ac 'Hook .*: installed') of them."
+	if printf '%s' "$run" | grep -aq 'Game ready: done'; then
+		log "The game reached 'ready' and GTA:Orange initialised."
+	else
+		log "The game has not reached 'ready' yet in this run (still loading, or the trigger never fired)."
+	fi
+	local translations
+	translations="$(printf '%s' "$run" | grep -a 'Natives: .* translation' | tail -n 1 | sed -E 's/.*Natives: ([0-9]+) translation.*/\1/')"
+	if [ -n "$translations" ] && [ "$translations" != "0" ]; then
+		log "Natives: $translations translations loaded."
+	elif printf '%s' "$run" | grep -aq 'no crossmap for game version'; then
+		log "Natives: NO crossmap loaded, so no script was started (see the crossmap line above)."
 	fi
 }
 
