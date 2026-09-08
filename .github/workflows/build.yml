@@ -176,7 +176,7 @@ jobs:
           Get-Content server.log
           if ($r.Content -notmatch "running") { throw "unexpected HTTP response" }
           if (-not (Select-String -Path server.log -Pattern "Server started" -Quiet)) { throw "server did not start" }
-          if ($handshake -ne 0) { throw "orange_handshake exit code $handshake: the server did not accept a player" }
+          if ($handshake -ne 0) { throw "orange_handshake exit code ${handshake}: the server did not accept a player" }
           Remove-Item stdin.txt, server.log, server.err -ErrorAction SilentlyContinue
 
       # The shell scripts end up on Linux machines; strip the CRLF that git on
