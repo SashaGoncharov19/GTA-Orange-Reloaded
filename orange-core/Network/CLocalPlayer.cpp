@@ -75,7 +75,7 @@ void CLocalPlayer::GetOnFootSync(OnFootSyncData& onfoot)
 		// through natives instead of dereferencing a 2017 member.
 		onfoot.bAiming = PLAYER::IS_PLAYER_FREE_AIMING(PLAYER::PLAYER_ID()) != 0;
 		Vector3 impact = { 0 };
-		onfoot.vecAim = (onfoot.bAiming && PED::GET_PED_LAST_WEAPON_IMPACT_COORD(Handle, &impact))
+		onfoot.vecAim = (onfoot.bAiming && WEAPON::GET_PED_LAST_WEAPON_IMPACT_COORD(Handle, &impact))
 			? CVector3(impact.x, impact.y, impact.z) : CVector3(0.f, 0.f, 0.f);
 	}
 	onfoot.bShooting = PED::IS_PED_SHOOTING(Handle) ? true : false;
