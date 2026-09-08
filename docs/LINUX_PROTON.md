@@ -144,24 +144,22 @@ The in-game "Server browser" window currently connects to the address in
 `orange.developer` next to `orange-core.dll` to get the *direct connect* fields
 (IP and port) in that window.
 
-## 3. Known limitation: supported GTA V build
+## 3. Supported GTA V build
 
-`orange-core.dll` hooks the game at about 90 addresses inside `GTA5.exe`. The
-built-in values were taken from the game build current in **January 2017**
-(the last commit of the original project); every game update moves them.
-
-To avoid crashing the game, the DLL first identifies the build (five byte
-signatures at their reference addresses) and resolves every address it needs
-(`GameOffsets::Initialize()` in `orange-core/GameOffsets.cpp`). On a different
-build `client.log` shows
+`orange-core.dll` hooks the game at about 90 addresses inside `GTA5.exe`.
+Only nine of them (the script engine) are required; they are found by byte
+patterns that were verified on GTA V **1.0.3889.0** (`docs/FINDINGS_1.0.3889.0.md`).
+Everything else is optional with a fallback, so the DLL activates on that
+build. On a build where a required entry does not resolve, `client.log`
+shows
 
 ```
-[Info] Game version: 1.0.3411.0, image base 0x7FF6C0A20000, image size 0x4A5B000
+[Info] Game version: 1.0.4000.0, image base 0x7FF6C0A20000, image size 0x4A5B000
 [Info] Game build check: NOT the reference build, offsets must come from offsets.ini or pattern scans
-[Error] offset CodeCave: UNRESOLVED (required) - no pattern known for this entry
+[Error] offset ScrThreadCollection: UNRESOLVED (required) - built-in 3 pattern(s) not found
 ...
-[Info] Offsets: 90 total, 0 reference, 0 from offsets.ini, 14 by pattern, 0 disabled, 76 unresolved (18 required)
-[Info] Offsets template written to Z:\home\you\gta-orange\client\offsets-1.0.3411.0.generated.ini
+[Info] Offsets: 92 total, 0 reference, 0 from offsets.ini, 20 by pattern, 0 disabled, 72 unresolved (1 required)
+[Info] Offsets template written to Z:\home\you\gta-orange\client\offsets-1.0.4000.0.generated.ini
 [Error] Game build check failed, GTA:Orange stays inactive
 ```
 
@@ -169,5 +167,16 @@ shows a message box and stays inactive. The generated
 `offsets-<version>.generated.ini` lists every entry with a description; the
 addresses for your build go into `offsets.ini` next to the DLL. The full
 workflow (syntax, how to find each kind of address, what else changes between
-builds) is in [UPDATING_OFFSETS.md](UPDATING_OFFSETS.md). The build/CI/Proton
-plumbing in this repository is ready for that work.
+builds) is in [UPDATING_OFFSETS.md](UPDATING_OFFSETS.md).
+
+Natives are called by their canonical hash and translated through
+`natives-<version>.txt` next to the DLL. `Launcher.exe` generates that file
+on first start from FiveM's public universal crossmap (an HTTPS download from
+GitHub inside the Proton prefix; `launcher.log` shows `natives: wrote N
+translation(s)`). Without internet access run
+`python3 tools/natives/crossmap_from_fivem.py --version 1.0.3889.0` on the
+Linux side and copy the file next to `orange-core.dll`.
+
+What the client still cannot do on a current build is described in
+`docs/PORTING_STATUS.md` (section 4): the structure layouts used by the
+synchronisation code are the 2017 ones.

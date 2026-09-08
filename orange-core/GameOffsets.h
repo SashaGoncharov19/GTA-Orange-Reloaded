@@ -63,6 +63,10 @@ namespace GameOffsets
 	uintptr_t Address(const char* name);
 	uintptr_t Rva(const char* name);
 	bool IsResolved(const char* name);
+	Source SourceOf(const char* name);
+	// True when the running game is at least `build` (third version component)
+	// and not the reference build; false when the version is unknown.
+	bool BuildAtLeast(int build);
 
 	// Writes offsets-<version>.generated.ini: every entry with its current
 	// state, ready to be filled in for a new game build.

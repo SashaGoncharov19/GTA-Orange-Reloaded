@@ -24,3 +24,11 @@ set_target_properties(natives_crossmap_test PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/tests"
   FOLDER "tests")
 add_test(NAME natives_crossmap_test COMMAND natives_crossmap_test)
+
+# FiveM universal crossmap -> natives-<version>.txt conversion (shared/NativeCrossmapUniversal.h)
+add_executable(universal_crossmap_test universal_crossmap_test.cpp)
+target_include_directories(universal_crossmap_test PRIVATE "${ORANGE_SHARED_DIR}")
+set_target_properties(universal_crossmap_test PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/tests"
+  FOLDER "tests")
+add_test(NAME universal_crossmap_test COMMAND universal_crossmap_test)

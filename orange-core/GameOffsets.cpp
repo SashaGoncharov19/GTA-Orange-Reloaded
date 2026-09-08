@@ -28,9 +28,11 @@ namespace GameOffsets
 
 static const Entry g_entries[] = {
 	// --- early startup / game flow (orange-core.cpp) -------------------------
+	// The startup patches carry the byte patterns the original authors wrote
+	// down next to them; they are applied wherever those patterns match.
 	{ "StartupPatch",                     0x14493,   NULL, 0, OPT, "8 bytes at function start replaced by 'jmp short +0x90'-style skip (EB 90 90 90 90 90 90 90); early startup check, purpose undocumented" },
-	{ "ForceToSingle",                    0x2773C,   "48 83 EC 28 85 D2 78 71 75 0F", 0, REQ, "function start; the rel32 at +0x3B is redirected to ForceToSingle_2 (forces single player session)" },
-	{ "ForceToSingle_2",                  0x186680,  "48 83 EC 28 B9 ? ? ? ? E8 ? ? ? ? B9 ? ? ? ? E8 ? ? ? ? B1 01", 0, REQ, "function start; jump target for ForceToSingle" },
+	{ "ForceToSingle",                    0x2773C,   "48 83 EC 28 85 D2 78 71 75 0F", 0, OPT, "function start of a game-flow dispatcher; the rel32 of the jmp at +0x3A is redirected to ForceToSingle_2 (forces the single player session). Applied only when both ForceToSingle entries resolve" },
+	{ "ForceToSingle_2",                  0x186680,  "48 83 EC 28 B9 ? ? ? ? E8 ? ? ? ? B9 ? ? ? ? E8 ? ? ? ? B1 01", 0, OPT, "function start; jump target for ForceToSingle" },
 	{ "UnknownPatch_1",                   0x1B348B,  "48 85 C9 0F 84 ? 00 00 00 48 8D 55 A7 E8", 0, OPT, "the 5-byte call at +13 becomes 'mov al,1; nop nop nop' (check forced to succeed)" },
 	{ "UnknownPatch_2",                   0x1AE3A0,  "E8 ? ? ? ? 8B CB 40 88 2D ? ? ? ?", 0, OPT, "5-byte call nopped" },
 	{ "UnknownPatch_3",                   0x1E6EF8,  "48 89 5C 24 ? 57 48 83 EC 20 8B F9 8B DA", 0, OPT, "function start, replaced by ret" },
@@ -44,21 +46,28 @@ static const Entry g_entries[] = {
 	{ "UnknownPatch_10",                  0xA64C5C,  NULL, 0, OPT, "function start, replaced by ret (original code: 0xA64CA6 - 74)" },
 
 	// --- game functions and globals called directly (DefineNatives) ----------
-	{ "ForceCleanupForAllThreadsWithThisName", 0xC70970, NULL, 0, REQ, "void(const char* scriptName, int mask); used to stop the single player scripts" },
-	{ "TerminateAllScriptsWithThisName",  0xA3DAE8,  NULL, 0, REQ, "void(const char* scriptName)" },
-	{ "ShutdownLoadingScreen",            0x1FBD34,  NULL, 0, REQ, "void(); native SHUTDOWN_LOADING_SCREEN implementation" },
-	{ "DoScreenFadeIn",                   0x2A1554,  NULL, 0, REQ, "void(int64 duration); native DO_SCREEN_FADE_IN implementation" },
-	{ "HasScriptLoaded",                  0xCE37E0,  NULL, 0, REQ, "bool(const char* scriptName); native HAS_SCRIPT_LOADED implementation" },
+	// All optional: where a function is unresolved the native behind it is
+	// used, or (script shutdown) the stock scripts are simply never ticked.
+	{ "ForceCleanupForAllThreadsWithThisName", 0xC70970, NULL, 0, OPT, "void(const char* scriptName, int mask); used to stop the single player scripts by name (reference build route)" },
+	{ "TerminateAllScriptsWithThisName",  0xA3DAE8,  NULL, 0, OPT, "void(const char* scriptName); used to stop the single player scripts by name (reference build route)" },
+	{ "ShutdownLoadingScreen",            0x1FBD34,  NULL, 0, OPT, "void(); native SHUTDOWN_LOADING_SCREEN implementation; the native is called from the script thread when unresolved" },
+	{ "DoScreenFadeIn",                   0x2A1554,  NULL, 0, OPT, "void(int64 duration); native DO_SCREEN_FADE_IN implementation; the native is called from the script thread when unresolved" },
+	{ "HasScriptLoaded",                  0xCE37E0,  NULL, 0, OPT, "bool(const char* scriptName); native HAS_SCRIPT_LOADED implementation (reference build route)" },
 	{ "CanLangChange",                    0x1C183F,  NULL, 0, OPT, "instruction with a 2-byte opcode + rel32 to a global; global + 1 is the 'language can change' bool toggled while the chat is open (a private bool is used when unresolved)" },
 	{ "InitializeOnline",                 0x103708,  NULL, 0, OPT, "void(); not called by the current code" },
-	{ "InitHUD",                          0x1F356C,  NULL, 0, OPT, "void(); HUD initialisation called once from the LookAlive hook, skipped when unresolved (original code: 0x1F358F - 0x23)" },
+	{ "InitHUD",                          0x1F356C,  NULL, 0, OPT, "void(); HUD initialisation called once from the per-frame hook, skipped when unresolved (original code: 0x1F358F - 0x23)" },
 	{ "EventHook",                        0x7FFF0C,  NULL, 0, OPT, "task event function start, replaced by a far jump to an empty handler" },
 
-	// --- main loop hooks (HookLoop) -------------------------------------------
-	{ "CodeCave",                         0x109D5D8, NULL, 0, REQ, "48 bytes of unused executable memory, filled with four 12-byte far jumps (LookAlive, GameStateChange, CreateWindowExW, BeginDisplay)" },
-	{ "LookAliveCall",                    0x67AE,    NULL, 0, REQ, "E8 call to the per-frame 'LookAlive' function; redirected through the code cave (original code: 0x67A7 + 7)" },
-	{ "GameStateChangeCall",              0x1EC8FA,  NULL, 0, REQ, "E8 call to the game state change function; redirected through the code cave" },
-	{ "WindowCreateCall",                 0x12416F7, NULL, 0, REQ, "6-byte FF 15 call to CreateWindowExW, replaced by a 5-byte call through the code cave + nop" },
+	// --- main loop hooks (GameHooks.cpp, orange-core.cpp) ---------------------
+	// orange-core needs one per-frame hook (LookAlive or LookAliveCall) and one
+	// 'game ready' trigger (StartupScript, GameStateChangeCall or the World
+	// ped poll); PreLoadPatches() checks that.
+	{ "CodeCave",                         0x109D5D8, NULL, 0, OPT, "48 bytes of unused executable memory for the far jumps of the call-site hooks; when unresolved a page within 2 GB of GTA5.exe is allocated instead" },
+	{ "LookAlive",                        0,         "40 55 53 56 57 41 57 48 8D 6C 24 C9 48 81 EC 90 00 00 00 8B 05", 0, OPT, "function start of the per-frame window message pump (SetThreadExecutionState + PeekMessage loop) the main loop calls every frame; hooked with MinHook. Preferred over LookAliveCall" },
+	{ "LookAliveCall",                    0x67AE,    "48 83 EC 28 E8 ? ? ? ? E8 ? ? ? ? 84 C0 74 ? E8 ? ? ? ? 80 3D", 4, OPT, "E8 call to the per-frame 'LookAlive' function; redirected through the code cave when LookAlive is unresolved (original code: 0x67A7 + 7)" },
+	{ "StartupScript",                    0,         "83 FB FF 0F 84 D6 00 00 00 @ -55 | 80 3D ? ? ? ? 00 48 8D 05 ? ? ? ? 4C 8D 05 ? ? ? ? 48 8D 54 24 30 48 8D 0D ? ? ? ? 4C 0F 45 C0 E8 @ -10", 0, OPT, "function start of 'start the startup script' (loads the 'startup' program and creates its thread); hooked with MinHook, GTA:Orange initialises its script engine and creates its own thread right before it, the way FiveM does. Preferred 'game ready' trigger" },
+	{ "GameStateChangeCall",              0x1EC8FA,  NULL, 0, OPT, "E8 call to the game state change function; redirected through the code cave. 'Game ready' trigger of the reference build" },
+	{ "WindowCreateCall",                 0x12416F7, "4C 8B C1 8B CE FF 15 ? ? ? ? 41 8B D4 48 8B C8 48 8B D8 FF 15", 5, OPT, "6-byte FF 15 call to CreateWindowExW creating the game window, replaced by a 5-byte call through the code cave + nop (window title and icon); the window handle is taken from the swap chain when unresolved" },
 	{ "BeginDisplayCall",                 0xCF31CB,  NULL, 0, OPT, "E8 call to DrawTextManager::BeginDisplay; redirected through the code cave" },
 
 	// --- gameplay patches (GameProcessHooks), all optional --------------------
@@ -98,37 +107,38 @@ static const Entry g_entries[] = {
 	{ "SnowPatch",                        0x4E1FA4,  NULL, 0, OPT, "20 bytes nopped by the /snow debug command" },
 
 	// --- script engine (Core/scrEngine.cpp, Core/scrThread.cpp) ---------------
-	// Alternates for the script engine come from FiveM's rage-scripting-five
-	// (scrEngine.cpp), which keeps one variant per family of game builds.
-	// FiveM points at the rel32 itself; our code points at the instruction
-	// (getOffset(3) / getOffset(2)), hence the deltas differ from theirs.
+	// Patterns come from FiveM's rage-scripting-five (scrEngine.cpp,
+	// scrThread.cpp), which keeps one variant per family of game builds, and
+	// were verified on 1.0.3889.0. FiveM points at the rel32 itself; our code
+	// points at the instruction (getOffset(3) / getOffset(2)), hence the
+	// deltas differ from theirs.
 	{ "ScrThreadCollection",              0x9DF347,
 	  "48 8B C8 EB ? 33 C9 48 8B 05 @ 7 | 48 8B C8 EB 03 49 8B CD 48 8B 05 @ 8 | 48 8B C8 EB 03 48 8B CB 48 8B 05 @ 8", 8, REQ,
-	  "'mov rax, [rip+X]' loading the script thread collection; rel32 at +3 (patterns from FiveM/ScriptHookV-style hooks, unverified; original code: 0x9DF33F + 8)" },
+	  "'mov rax, [rip+X]' loading the script thread collection (atArray of GtaThread*); rel32 at +3 (original code: 0x9DF33F + 8)" },
 	{ "ActiveThreadTlsOffset",            0x14AE8E9,
 	  "48 8B 04 D0 4A 8B 14 00 48 8B 01 F3 44 0F 2C 42 20 @ -4 | 48 8B 04 D0 4A 8B 14 00 48 8B 01 F3 0F 10 40 20 @ -4", -4, REQ,
-	  "32-bit immediate: TLS offset of the active script thread (patterns from FiveM-style hooks, unverified; original code: 0x14AE8ED - 4)" },
+	  "32-bit immediate: TLS offset of the active script thread (original code: 0x14AE8ED - 4)" },
 	{ "ScrThreadId",                      0x30A9E0B,
 	  "8B 15 ? ? ? ? 48 8B 05 ? ? ? ? FF C2 89 15 ? ? ? ? 48 8B 0C F8 @ 0 | 8B 15 ? ? ? ? 48 8B 05 ? ? ? ? FF C2 89 15 ? ? ? ? 48 8B 0C D8 @ 0 | 8B 15 ? ? ? ? 48 8B 05 ? ? ? ? FF C2 89 15 ? ? ? ? E9 @ 0 | 8B 15 ? ? ? ? 48 8B 05 ? ? ? ? FF C2 89 @ 0 | 89 15 ? ? ? ? 48 8B 0C D8 @ 0", 0, REQ,
-	  "'mov edx, [rip+X]' / 'mov [rip+X], edx' of the next script thread id; rel32 at +2 (patterns from FiveM-style hooks, unverified; original code: 0x30A9E04 + 7)" },
+	  "'mov edx, [rip+X]' / 'mov [rip+X], edx' of the next script thread id; rel32 at +2 (original code: 0x30A9E04 + 7)" },
 	{ "ScrThreadCount",                   0x14AFE13,
 	  "FF 0D ? ? ? ? 48 8B D9 75 @ 0 | FF 0D ? ? ? ? 48 8B F9 @ 0", 0, REQ,
-	  "'dec dword [rip+X]' of the script thread count; rel32 at +2 (patterns from FiveM-style hooks, unverified)" },
-	{ "RegistrationTable",                0x14B1A55, "76 32 48 8B 53 40 @ 6 | 76 61 49 8B 7A 40 48 8D 0D @ 6", 6, REQ, "3-byte-opcode instruction + rel32 to the native registration table (lea); rel32 at +3 (patterns from FiveM-style hooks, unverified; original code: 0x14B1A4F + 6)" },
-	{ "ScriptHandlerMgr",                 0x9ED224,  "74 17 48 8B C8 E8 ? ? ? ? 48 8D 0D", 10, REQ, "'lea rcx, [rip+X]' of the script handler manager; rel32 at +3 (unverified pattern; original code: 0x9ED21A + 10)" },
-	{ "GetScriptIdBlock",                 0x14B4CCA, "74 41 48 8B 01 FF 50 10 84 C0 @ 0 | 74 3C 48 8B 01 FF 50 10 84 C0 @ 0", 0, REQ, "ERR_SYS_PURE check; the two bytes at +4 are inspected (patterns from FiveM-style hooks, unverified)" },
-	{ "ScriptThreadTick",                 0x9F645C,  "80 B9 46 01 00 00 00 8B FA 48 8B D9 74 05", -0xF, REQ, "eThreadState __thiscall(scrThread*, uint32 opsToExecute) (unverified pattern; original code: 0x9F646B - 0xF)" },
-	{ "ScriptThreadKill",                 0x9ECF6C,  "48 83 EC 20 48 83 B9 ? 01 00 00 00 48 8B D9 74 14", -6, REQ, "void __thiscall(scrThread*) (unverified pattern; original code: 0x9ECF72 - 6)" },
-	{ "ScriptThreadInit",                 0x9EB4DC,  NULL, 0, REQ, "void __thiscall(scrThread*); initialises a freshly reset script thread" },
+	  "'dec dword [rip+X]' of the script thread count; rel32 at +2" },
+	{ "RegistrationTable",                0x14B1A55, "76 32 48 8B 53 40 @ 6 | 76 61 49 8B 7A 40 48 8D 0D @ 6", 6, REQ, "'lea rcx, [rip+X]' of the native registration table (256 buckets); rel32 at +3 (original code: 0x14B1A4F + 6)" },
+	{ "ScriptHandlerMgr",                 0x9ED224,  "74 17 48 8B C8 E8 ? ? ? ? 48 8D 0D", 10, REQ, "'lea rcx, [rip+X]' of the script handler manager (AttachScript = vtable slot 10); rel32 at +3 (original code: 0x9ED21A + 10)" },
+	{ "ScriptIdCompare",                  0,         "74 41 48 8B 01 FF 50 10 84 C0 @ -26 | 74 3C 48 8B 01 FF 50 10 84 C0 @ -26", 0, OPT, "function start of the script id comparison used by 'may this script use this entity' checks; hooked with MinHook to answer yes while the stock scripts are disabled (as FiveM does)" },
+	{ "ScriptThreadTick",                 0x9F645C,  "80 B9 46 01 00 00 00 8B FA 48 8B D9 74 05 @ -15 | 80 B9 ? 01 00 00 00 8B FA 48 8B D9 74 05 @ -15", -0xF, REQ, "eThreadState __thiscall(scrThread*, uint32 opsToExecute) = GtaThread::Tick; also hooked with MinHook so that only GTA:Orange's threads run and the stock single player scripts stay frozen (original code: 0x9F646B - 0xF)" },
+	{ "ScriptThreadKill",                 0x9ECF6C,  "48 83 EC 20 48 83 B9 ? 01 00 00 00 48 8B D9 74 14", -6, REQ, "void __thiscall(scrThread*) = GtaThread::Kill; the displacement of its 'cmp qword [rcx+X], 0' at +0xA tells where the script handler lives in the thread object (original code: 0x9ECF72 - 6)" },
+	{ "ScriptThreadInit",                 0x9EB4DC,  "83 89 ? 01 00 00 FF 83 A1 ? 01 00 00 F0", 0, REQ, "void __thiscall(scrThread*); initialises the GTA part of a freshly reset script thread" },
 
 	// --- RAGE globals (GTA/CRage.cpp, GTA/CReplayInterface.cpp) ---------------
 	{ "PlayerColor",                      0x1E5C90,  NULL, 0, OPT, "instruction with a 2-byte opcode + rel32 to the player colour table; 4 BGRA entries start at +4" },
-	{ "ViewportGame",                     0xA27578,  NULL, 0, REQ, "instruction with a 3-byte opcode + rel32 to the CViewportGame* global" },
-	{ "GetEntityFromScriptHandle",        0x15013C,  NULL, 0, REQ, "CEntity*(int scriptHandle); resolves script handles to game entities" },
-	{ "World",                            0x89E04D,  NULL, 0, REQ, "instruction with a 3-byte opcode + rel32 to the CWorld* global" },
+	{ "ViewportGame",                     0xA27578,  NULL, 0, OPT, "instruction with a 3-byte opcode + rel32 to the CViewportGame* global (view matrix at +0x24C, size at +0x450 on the reference build); natives do the world-to-screen projection when unresolved" },
+	{ "GetEntityFromScriptHandle",        0x15013C,  "83 F9 FF 74 ? 8B D1 C1 FA 08 85 D2 78 ? 4C 8B 05 ? ? ? ? 41 3B 50 10", 0, OPT, "CEntity*(int scriptHandle) = fwScriptGuid::GetBaseFromGuid; resolves script handles to game entities" },
+	{ "World",                            0x89E04D,  "48 8B 05 ? ? ? ? 48 8B 40 08 C3", 0, OPT, "instruction with a 3-byte opcode + rel32 to the CWorld* (ped factory) global whose +8 is the local player ped; also the fallback 'game ready' poll" },
 	{ "VehicleFactory",                   0xE43BF4,  NULL, 0, OPT, "instruction with a 3-byte opcode + rel32 to the vehicle factory; not used by the current code" },
-	{ "ReplayInterfaces",                 0x1CB4,    NULL, 0, REQ, "instruction with a 3-byte opcode + rel32 to the ReplayInterfaces* global (entity pools)" },
-	{ "GetEntityAddressCall",             0xA29ECE,  NULL, 0, REQ, "7-byte instruction whose rel32 at +3 points to the 'entity address from handle' function" },
+	{ "ReplayInterfaces",                 0x1CB4,    NULL, 0, OPT, "instruction with a 3-byte opcode + rel32 to the ReplayInterfaces* global (entity pools); only the debug overlay reads it" },
+	{ "GetEntityAddressCall",             0xA29ECE,  NULL, 0, OPT, "7-byte instruction whose rel32 at +3 points to the 'entity address from handle' function; GetEntityFromScriptHandle is used instead when unresolved" },
 
 	// --- allocator and task sync (GTA/sysAllocator.cpp, Network/*) -----------
 	{ "HeapTask",                         0x4E05,    NULL, 0, OPT, "instruction with a 3-byte opcode + rel32 to the task heap allocator global" },
@@ -141,7 +151,7 @@ static const Entry g_entries[] = {
 	{ "ShowAbilityBar",                   0x1F26D4,  NULL, 0, OPT, "int(bool show); hides the special ability bar" },
 
 	// --- rendering ------------------------------------------------------------
-	{ "SwapChain",                        0x124BDC5, NULL, 0, REQ, "instruction with a 3-byte opcode + rel32 to the IDXGISwapChain* global (chat / UI rendering)" },
+	{ "SwapChain",                        0x124BDC5, NULL, 0, OPT, "instruction with a 3-byte opcode + rel32 to the game's IDXGISwapChain* global; when unresolved Present is hooked through the vtable of a temporary swap chain, which works on every build" },
 	{ "ScaleformManager",                 0x1F3A868, NULL, 0, OPT, "rage::ScaleformManager* global (direct pointer, not rel32); only used with ORANGE_ENABLE_SCALEFORM" },
 	{ "ScaleformCreateText",              0x15ECB18, NULL, 0, OPT, "GFx DrawTextManager::CreateText; only used with ORANGE_ENABLE_SCALEFORM" },
 };
@@ -673,6 +683,20 @@ bool IsResolved(const char* name)
 {
 	const Status* s = Lookup(name);
 	return s && s->rva != 0;
+}
+
+Source SourceOf(const char* name)
+{
+	const Status* s = Lookup(name);
+	return s ? s->source : Source::Unresolved;
+}
+
+bool BuildAtLeast(int build)
+{
+	if (g_referenceBuild)
+		return false;
+	int current = GameBuildNumber();
+	return current != 0 && current >= build;
 }
 
 bool WriteTemplate(const std::string& path)

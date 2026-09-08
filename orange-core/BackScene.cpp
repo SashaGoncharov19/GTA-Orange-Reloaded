@@ -2,9 +2,10 @@
 
 void BackScene()
 {
-	auto viewPortGame = GTA::CViewportGame::Get();
+	float screenW = 0.f, screenH = 0.f;
+	CGraphics::Get()->ScreenSize(screenW, screenH);
 	ImGui::SetNextWindowPos(ImVec2(0.f, 0.f), ImGuiSetCond_Always);
-	ImGui::Begin("Background", 0, ImVec2((float)viewPortGame->Width, (float)viewPortGame->Height), 0.f, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
+	ImGui::Begin("Background", 0, ImVec2(screenW, screenH), 0.f, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
 	ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 0.f);
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0.f, 0.f));
@@ -15,16 +16,21 @@ void BackScene()
 	if (CGlobals::Get().currentGameState == GameStatePlaying && CGlobals::Get().isDebug)
 	{
 		std::stringstream ss;
-		ss << "Peds pool: " << ReplayInterfaces::Get()->ReplayInterfacePed->pool.Count() << " / " << ReplayInterfaces::Get()->ReplayInterfacePed->pool.Capacity() << std::endl <<
-			"Vehicles pool: " << ReplayInterfaces::Get()->ReplayInterfaceVeh->pool.Count() << " / " << ReplayInterfaces::Get()->ReplayInterfaceVeh->pool.Capacity() << std::endl <<
-			"Objects pool: " << ReplayInterfaces::Get()->ReplayInterfaceObject->pool.Count() << " / " << ReplayInterfaces::Get()->ReplayInterfaceObject->pool.Capacity() << std::endl <<
+		ReplayInterfaces* replay = ReplayInterfaces::Get();
+		if (replay)
+			ss << "Peds pool: " << replay->ReplayInterfacePed->pool.Count() << " / " << replay->ReplayInterfacePed->pool.Capacity() << std::endl <<
+				"Vehicles pool: " << replay->ReplayInterfaceVeh->pool.Count() << " / " << replay->ReplayInterfaceVeh->pool.Capacity() << std::endl <<
+				"Objects pool: " << replay->ReplayInterfaceObject->pool.Count() << " / " << replay->ReplayInterfaceObject->pool.Capacity() << std::endl;
+		else
+			ss << "Entity pools: n/a (ReplayInterfaces unresolved on this build)" << std::endl;
+		ss <<
 			"Ped pos: " << CLocalPlayer::Get()->GetPosition().ToString() << std::endl <<
 			"Ped heading: " << CLocalPlayer::Get()->GetHeading() << std::endl <<
 			"FPS: " << ImGui::GetIO().Framerate;
 
 		const char* text = ss.str().c_str();
-		float x = 0.23f * viewPortGame->Width;
-		float y = 0.85f * viewPortGame->Height;
+		float x = 0.23f * screenW;
+		float y = 0.85f * screenH;
 		ImColor color = ImColor(0x21, 0x96, 0xF3, 0xFF);
 
 		ImGui::GetWindowDrawList()->AddText(CGlobals::Get().chatFont, 14.f, ImVec2(x - 1, y - 1), ImColor(0, 0, 0, 255), text);

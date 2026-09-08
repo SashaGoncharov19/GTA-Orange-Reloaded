@@ -141,13 +141,17 @@ uintptr_t CEntity::GetAddress()
 void CEntity::InitOffsetFunc()
 {
 	uintptr_t address = GameOffsets::Address("GetEntityAddressCall");
-	if (!address)
+	if (address)
 	{
-		log_error << "CEntity: GetEntityAddressCall unresolved, entity addresses unavailable" << std::endl;
-		_entityAddressFunc = nullptr;
+		_entityAddressFunc = reinterpret_cast<GetEntityOffsetFunc>(*reinterpret_cast<int *>(address + 3) + address + 7);
 		return;
 	}
-	_entityAddressFunc = reinterpret_cast<GetEntityOffsetFunc>(*reinterpret_cast<int *>(address + 3) + address + 7);
+	// fwScriptGuid::GetBaseFromGuid does the same job on every build.
+	_entityAddressFunc = GameFunc<GetEntityOffsetFunc>("GetEntityFromScriptHandle");
+	if (_entityAddressFunc)
+		log_info << "CEntity: entity addresses resolved through GetEntityFromScriptHandle" << std::endl;
+	else
+		log_error << "CEntity: GetEntityAddressCall and GetEntityFromScriptHandle unresolved, entity addresses unavailable" << std::endl;
 }
 
 CEntity::CEntity(Entity handle) :Handle(handle)

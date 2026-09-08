@@ -7,6 +7,8 @@ enum eThreadState {
 	ThreadState4,
 };
 
+// scrThreadContext: 168 (0xA8) bytes, stable across builds since the reference
+// build. Lives at +8 in a thread object (right after the vtable pointer).
 class scrThreadContext {
 public:
 
@@ -46,15 +48,23 @@ public:
 	inline uint32_t				GetId() { return m_Context.m_iThreadId; }
 };
 
+// The GTA-specific part of a script thread object (the "GtaThread") starts at
+// +0xD0 and its members moved between the reference build (script handler at
+// +0x110) and current builds (2699+: +0x118). Rather than hard-code one
+// layout, ScriptThread reserves a generous zeroed buffer so that the game's
+// own initialise / tick / kill code (which writes up to +0x15C on 1.0.3889.0)
+// always stays inside the object, and reaches the two fields orange-core
+// itself touches through the runtime offset ScriptEngine::ScriptHandlerOffset()
+// (the network flag sits a constant 0x31 bytes after the handler on every
+// build seen so far). See Core/scrThread.cpp and docs/PORTING_STATUS.md.
+static const size_t kScriptThreadSize = 0x2C0;   // >= any known GtaThread size, with margin
+
 class ScriptThread : public scrThread {
 private:
+	char _gtaThreadData[kScriptThreadSize - 0xD0];   // 0xD0 = sizeof(scrThread)
 
-	char _0x00D0[64];
-	void *						m_pScriptHandler;	//0x0110 
-	char _0x0118[40];
-	uint8_t						m_bFlag1;			//0x0140 
-	uint8_t						m_bNetworkFlag;		//0x0141 
-	char _0x0142[22];
+	void ** ScriptHandlerSlot();
+	uint8_t * NetworkFlagByte();
 
 public:
 	virtual void				DoRun() = 0;
@@ -62,5 +72,7 @@ public:
 	virtual eThreadState		Run(uint32_t opsToExecute);
 	virtual eThreadState		Tick(uint32_t opsToExecute);
 	virtual void				Kill();
-	inline void *				GetScriptHandler() { return m_pScriptHandler; }
+
+	void *						GetScriptHandler();
+	void						SetScriptNetworkFlag(bool value);
 };

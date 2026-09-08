@@ -777,8 +777,16 @@ bool IsScriptsDisabled()
 	return scriptsDisabled;
 }
 
+bool CanDisableScriptsByName()
+{
+	CGlobals& g = CGlobals::Get();
+	return g.HasScriptLoaded != nullptr && g.ForceCleanupForAllThreadsWithThisName != nullptr && g.TerminateAllScriptsWithThisName != nullptr;
+}
+
 bool IsAnyScriptLoaded()
 {
+	if (!CGlobals::Get().HasScriptLoaded)
+		return false;
 	for (int i = 0; i < 748; i++)
 		if (CGlobals::Get().HasScriptLoaded(scriptnames[i].name))
 			return true;
@@ -787,6 +795,13 @@ bool IsAnyScriptLoaded()
 
 void DisableScripts()
 {
+	if (!CanDisableScriptsByName())
+	{
+		// The stock scripts are kept frozen by the thread tick hook instead
+		// (ScriptEngine::InstallHooks).
+		scriptsDisabled = true;
+		return;
+	}
 	for (int i = 0; i < 748; i++) {
 		if (!scriptnames[i].enable) {
 			CGlobals::Get().ForceCleanupForAllThreadsWithThisName(scriptnames[i].name, 8);

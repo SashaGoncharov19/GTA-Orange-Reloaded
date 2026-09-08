@@ -36,6 +36,10 @@ public:
 	// as a PE that IDA / Ghidra can open. Returns false with an explanation on failure.
 	bool DumpGame(const std::wstring& outputDir, std::wstring& writtenPath, std::string& error);
 	void PushLibrary(std::string path);
+	// Full path of the running GTA5.exe ("" when it is not running or cannot be queried).
+	std::wstring FindGameExePath();
+	// "1.0.3889.0" from the version resource of an executable, "" when unreadable.
+	static std::wstring GameFileVersion(const std::wstring& exePath);
 
 
 	// static methods
