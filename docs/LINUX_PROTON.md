@@ -46,8 +46,11 @@ to customise it.
 
 * Steam + GTA V (Steam version) installed and started **at least once** with
   Proton, so that the prefix `steamapps/compatdata/271590` exists.
-* The client package `gta-orange-client-win64.zip` (releases page) unpacked
-  somewhere, e.g. `~/gta-orange/client`.
+* The client package `gta-orange-client-win64.zip` (releases page). The
+  archive contains a `client/` folder, so unpack it in the parent folder:
+  `mkdir -p ~/gta-orange && cd ~/gta-orange && unzip gta-orange-client-win64.zip`
+  gives `~/gta-orange/client`. To refresh an existing folder in place use
+  `unzip -o -j gta-orange-client-win64.zip -d ~/gta-orange/client`.
 * `bash`, `pgrep` and either the `steam` command or `xdg-open`.
 
 ### Run
@@ -57,6 +60,10 @@ cd ~/gta-orange/client
 chmod +x gta-orange-proton.sh
 ./gta-orange-proton.sh
 ```
+
+The script compares `version.txt` of the package with the launcher version in
+`launcher.log` and warns when the binaries next to it are not the ones from
+the package.
 
 The script
 

@@ -109,15 +109,38 @@ summarize_client_log() {
 	fi
 }
 
+# The binaries next to this script must be the ones from the package: the
+# auto-updater may have replaced them, or the zip (which contains a client/
+# folder) was unpacked inside the client folder. Compares version.txt with
+# the version the launcher wrote to launcher.log.
+check_package_version() {
+	[ -f "$CLIENT_DIR/version.txt" ] && [ -f "$LAUNCHER_LOG" ] || return 0
+	local packaged running
+	packaged="$(tr -d '[:space:]' < "$CLIENT_DIR/version.txt")"
+	running="$(grep -a 'GTA:Orange Launcher .* started' "$LAUNCHER_LOG" | tail -n 1 | sed -E 's/.*GTA:Orange Launcher (.*) started.*/\1/')"
+	if [ -n "$packaged" ] && [ -n "$running" ] && [ "$packaged" != "$running" ]; then
+		log "WARNING: the launcher that ran is version '$running', but this package is '$packaged'."
+		log "         Launcher.exe / orange-core.dll next to this script are not the ones from the package"
+		log "         (the auto-updater replaced them, or the zip was unpacked into another folder)."
+		log "         Unpack the package over this folder with:  unzip -o -j gta-orange-client-win64.zip -d '$CLIENT_DIR'"
+	fi
+}
+
 if [ "$LOGS_ONLY" = 1 ]; then
 	show_log "$LAUNCHER_LOG" 40
 	show_log "$CLIENT_LOG" 60
 	summarize_client_log
+	check_package_version
 	exit 0
 fi
 
 [ -f "$CLIENT_DIR/Launcher.exe" ] || die "Launcher.exe not found in '$CLIENT_DIR' (use --client-dir)"
 [ -f "$CLIENT_DIR/orange-core.dll" ] || die "orange-core.dll not found in '$CLIENT_DIR'"
+if [ -f "$CLIENT_DIR/client/Launcher.exe" ]; then
+	log "WARNING: $CLIENT_DIR/client/Launcher.exe exists: the zip was probably unpacked inside the client folder."
+	log "         This run uses $CLIENT_DIR/Launcher.exe. To use the freshly unpacked files instead:"
+	log "         unzip -o -j gta-orange-client-win64.zip -d '$CLIENT_DIR' && rm -r '$CLIENT_DIR/client'"
+fi
 
 # --- Steam root ---------------------------------------------------------------
 find_steam_root() {
@@ -215,6 +238,7 @@ if [ "$LOG_TAIL" = 1 ]; then
 	show_log "$LAUNCHER_LOG" 25
 	show_log "$CLIENT_LOG" 40
 	summarize_client_log
+	check_package_version
 	log "Re-print the logs any time with: $0 --logs"
 fi
 exit "$status"
