@@ -58,7 +58,8 @@ if(MSVC)
     _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
     NOMINMAX)
   # Only for C/C++: CMake would otherwise hand these to rc.exe as well.
-  foreach(_flag /bigobj /wd4996 /wd4267 /wd4244 /wd4800 /wd4305)
+  # (C4838: the embedded Lua bytecode arrays trigger it a few thousand times)
+  foreach(_flag /bigobj /wd4996 /wd4267 /wd4244 /wd4800 /wd4305 /wd4838 /wd4309)
     add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:${_flag}>")
   endforeach()
   if(CMAKE_GENERATOR MATCHES "Visual Studio")
