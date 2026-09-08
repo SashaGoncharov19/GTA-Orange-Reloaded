@@ -57,18 +57,23 @@ if(MSVC)
     _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
     _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
     NOMINMAX)
-  add_compile_options(/bigobj /wd4996 /wd4267 /wd4244 /wd4800 /wd4305)
+  # Only for C/C++: CMake would otherwise hand these to rc.exe as well.
+  foreach(_flag /bigobj /wd4996 /wd4267 /wd4244 /wd4800 /wd4305)
+    add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:${_flag}>")
+  endforeach()
   if(CMAKE_GENERATOR MATCHES "Visual Studio")
-    add_compile_options(/MP)
+    add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:/MP>")
   endif()
   if(CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(WARNING "GTA:Orange targets 64-bit builds; 32-bit is unsupported.")
   endif()
 else()
-  add_compile_options(-Wall
-    -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-function
-    -Wno-sign-compare -Wno-reorder -Wno-unknown-pragmas -Wno-deprecated-declarations
-    -Wno-misleading-indentation -Wno-parentheses -Wno-unused-result)
+  foreach(_flag -Wall
+      -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-function
+      -Wno-sign-compare -Wno-reorder -Wno-unknown-pragmas -Wno-deprecated-declarations
+      -Wno-misleading-indentation -Wno-parentheses -Wno-unused-result)
+    add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:${_flag}>")
+  endforeach()
 endif()
 
 set(ORANGE_SERVER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/bin/server")
