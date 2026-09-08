@@ -100,9 +100,9 @@ show_log() {
 summarize_update() {
 	[ -f "$LAUNCHER_LOG" ] || return 0
 	local running downloaded remote
-	running="$(grep -a 'Launcher .* starting' "$LAUNCHER_LOG" | tail -n 1 | sed -E 's/.*Launcher ([^ ]+) starting.*/\1/')"
+	running="$(grep -a 'Launcher .* starting' "$LAUNCHER_LOG" | tail -n 1 | sed -E 's/.*Launcher ([^ ]+) starting.*/\1/' || true)"
 	downloaded="$(grep -ac 'updater: downloading' "$LAUNCHER_LOG" || true)"
-	remote="$(grep -a 'updater: local version' "$LAUNCHER_LOG" | tail -n 1 | sed -E 's/.*remote version ([^,]+).*/\1/')"
+	remote="$(grep -a 'updater: local version' "$LAUNCHER_LOG" | tail -n 1 | sed -E 's/.*remote version ([^,]+).*/\1/' || true)"
 	[ -n "$running" ] && log "Client version: $running"
 	if grep -aq 'just restarted after a self-update' "$LAUNCHER_LOG"; then
 		log "Auto-update: the client updated itself and restarted (now on $running)"
@@ -141,7 +141,13 @@ summarize_client_log() {
 	fi
 
 	for marker in orange.nohooks orange.storymode orange.developer; do
-		[ -f "$CLIENT_DIR/$marker" ] && log "NOTE: $marker is present next to orange-core.dll and changes what it does."
+		[ -f "$CLIENT_DIR/$marker" ] || continue
+		case "$marker" in
+			orange.storymode) log "NOTE: orange.storymode is present: the single player scripts keep running (HUD, missions, story)."
+			                  log "      Delete it for the normal behaviour, where only GTA:Orange runs once the game has booted." ;;
+			orange.nohooks)   log "NOTE: orange.nohooks is present: orange-core resolves the offsets and does nothing else." ;;
+			orange.developer) log "NOTE: orange.developer is present (developer mode: relaxed build check, debug commands)." ;;
+		esac
 	done
 
 	local run
@@ -149,8 +155,8 @@ summarize_client_log() {
 	[ -n "$run" ] || run="$(cat "$CLIENT_LOG")"
 
 	local version started
-	started="$(printf '%s' "$run" | grep -a 'loaded from' | tail -n 1 | sed -E 's/^\[([^]]*)\].*/\1/')"
-	version="$(printf '%s' "$run" | grep -a 'Game version:' | tail -n 1 | sed -E 's/.*Game version: ([^,]+),.*/\1/')"
+	started="$(printf '%s' "$run" | grep -a 'loaded from' | tail -n 1 | sed -E 's/^\[([^]]*)\].*/\1/' || true)"
+	version="$(printf '%s' "$run" | grep -a 'Game version:' | tail -n 1 | sed -E 's/.*Game version: ([^,]+),.*/\1/' || true)"
 	[ -n "$started" ] && log "Last orange-core run: $started"
 	[ -n "$version" ] && log "GTA5.exe version seen by orange-core: $version"
 
@@ -171,11 +177,37 @@ summarize_client_log() {
 		log "The game has not reached 'ready' yet in this run (still loading, or the trigger never fired)."
 	fi
 	local translations
-	translations="$(printf '%s' "$run" | grep -a 'Natives: .* translation' | tail -n 1 | sed -E 's/.*Natives: ([0-9]+) translation.*/\1/')"
+	translations="$(printf '%s' "$run" | grep -a 'Natives: .* translation' | tail -n 1 | sed -E 's/.*Natives: ([0-9]+) translation.*/\1/' || true)"
 	if [ -n "$translations" ] && [ "$translations" != "0" ]; then
 		log "Natives: $translations translations loaded."
 	elif printf '%s' "$run" | grep -aq 'no crossmap for game version'; then
 		log "Natives: NO crossmap loaded, so no script was started (see the crossmap line above)."
+	fi
+
+	local exceptions missing
+	exceptions="$(printf '%s' "$run" | grep -ac 'exception inside native' || true)"
+	missing="$(printf '%s' "$run" | grep -ac 'Natives: no handler for' || true)"
+	[ "${exceptions:-0}" != "0" ] && log "Natives: $exceptions call(s) threw inside the game ('exception inside native' lines in client.log)."
+	[ "${missing:-0}" != "0" ] && log "Natives: $missing native(s) have no handler in this build ('no handler for' lines in client.log)."
+
+	# The connection: orange-core logs every step of it since 2026-09-08.
+	local config net
+	config="$(printf '%s' "$run" | grep -a 'Config: server' | tail -n 1 | sed -E 's/.*Config: //' || true)"
+	[ -n "$config" ] && log "Client config: $config"
+	if printf '%s' "$run" | grep -aq 'Network: the server accepted the player'; then
+		log "Connected: the server accepted the player, the game is synchronised with it."
+	elif printf '%s' "$run" | grep -aq 'Network: connection accepted by'; then
+		log "Connected to the server; the player was not accepted yet (or the run ended before)."
+	elif printf '%s' "$run" | grep -aq 'Network: no answer from'; then
+		net="$(printf '%s' "$run" | grep -a 'Network: no answer from' | tail -n 1 | sed -E 's/.*Network: //' || true)"
+		log "Not connected: $net"
+		log "         Start the server first (docs/LINUX_PROTON.md, section 1), then press Connect again"
+		log "         (F12 opens the server browser, or type /connect host:port in the chat)."
+	elif printf '%s' "$run" | grep -aq 'Network: connecting to'; then
+		net="$(printf '%s' "$run" | grep -a 'Network: connecting to' | tail -n 1 | sed -E 's/.*Network: //' || true)"
+		log "Network: $net, no answer recorded (yet)."
+	elif printf '%s' "$run" | grep -aq 'Game ready: done'; then
+		log "No connection was attempted in this run (the server browser: nickname, address, Connect)."
 	fi
 }
 
@@ -187,7 +219,7 @@ check_package_version() {
 	[ -f "$CLIENT_DIR/version.txt" ] && [ -f "$LAUNCHER_LOG" ] || return 0
 	local packaged running
 	packaged="$(tr -d '[:space:]' < "$CLIENT_DIR/version.txt")"
-	running="$(grep -a 'GTA:Orange Launcher .* started' "$LAUNCHER_LOG" | tail -n 1 | sed -E 's/.*GTA:Orange Launcher (.*) started.*/\1/')"
+	running="$(grep -a 'GTA:Orange Launcher .* started' "$LAUNCHER_LOG" | tail -n 1 | sed -E 's/.*GTA:Orange Launcher (.*) started.*/\1/' || true)"
 	if [ -n "$packaged" ] && [ -n "$running" ] && [ "$packaged" != "$running" ]; then
 		log "WARNING: the launcher that ran is version '$running', but this package is '$packaged'."
 		log "         OrangeLauncher.exe / orange-core.dll next to this script are not the ones from the package"

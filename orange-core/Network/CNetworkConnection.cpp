@@ -21,26 +21,48 @@ CNetworkConnection * CNetworkConnection::Get()
 
 bool CNetworkConnection::Connect(std::string host, unsigned short port)
 {
-	if (!host.empty() && port)
+	if (host.empty() || !port)
+		return false;
+	sHost = host;
+	usPort = port;
+
+	RakNet::SocketDescriptor socketDescriptor(0, 0);
+	socketDescriptor.socketFamily = AF_INET;
+
+	RakNet::StartupResult started = client->Startup(8, &socketDescriptor, 1);
+	client->SetOccasionalPing(true);
+	connection = client->Connect(host.c_str(), port, 0, 0);
+	log_info << "Network: connecting to " << Address() << " (startup " << (int)started << ", attempt " << (int)connection << ")" << std::endl;
+	if (connection != RakNet::CONNECTION_ATTEMPT_STARTED && connection != RakNet::CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS)
 	{
-		RakNet::SocketDescriptor socketDescriptor(0, 0);
-
-		socketDescriptor.socketFamily = AF_INET;
-
-		client->Startup(8, &socketDescriptor, 1);
-		client->SetOccasionalPing(true);
-		connection = client->Connect(host.c_str(), port, 0, 0);
-		RakAssert(connection == RakNet::CONNECTION_ATTEMPT_STARTED);
-		bConnected = true;
-		CRPCPlugin::Get();
-		return true;
+		log_error << "Network: the connection attempt to " << Address() << " could not be started (RakNet result " << (int)connection << ")" << std::endl;
+		return false;
 	}
-	return false;
+	bConnected = true;
+	bEstablished = false;
+	CRPCPlugin::Get();
+	return true;
+}
+
+void CNetworkConnection::ConnectTo(const std::string & host, unsigned short port)
+{
+	CNetworkPlayer::Clear();
+	CNetworkVehicle::Clear();
+	CNetworkObject::Clear();
+	if (IsConnected())
+		Disconnect();
+	std::stringstream ss;
+	ss << "Connecting to " << host << ":" << port;
+	CChat::Get()->AddChatMessage(ss.str());
+	if (!Connect(host, port))
+		CChat::Get()->AddChatMessage("Can't connect to the server", { 255, 0, 0, 255 });
 }
 
 void CNetworkConnection::Disconnect()
 {
+	log_info << "Network: disconnecting from " << Address() << std::endl;
 	bConnected = false;
+	bEstablished = false;
 	client->Shutdown(300);
 	CChat::Get()->Clear();
 	CChat::Get()->AddChatMessage("Disconnected");
@@ -58,6 +80,8 @@ void CNetworkConnection::Tick()
 		switch (packetID) {
 			case ID_CONNECTION_REQUEST_ACCEPTED:
 			{
+				log_info << "Network: connection accepted by " << packet->systemAddress.ToString(true) << std::endl;
+				CChat::Get()->AddChatMessage("Connected to " + Address());
 				CLocalPlayer::Get()->FreezePosition(false);
 				CLocalPlayer::Get()->SetVisible(true);
 				RakString playerName(CConfig::Get()->sNickName.c_str());
@@ -70,8 +94,14 @@ void CNetworkConnection::Tick()
 			}
 			case ID_CONNECTION_ATTEMPT_FAILED:
 			{
+				// Nothing answered on that address: no server there, a
+				// firewall, or a server bound to IPv6 only (the client uses IPv4).
+				log_error << "Network: no answer from " << Address() << " (is orange_server running there on UDP " << usPort << "?)" << std::endl;
 				CLocalPlayer::Get()->SetMoney(0);
-				CChat::Get()->AddChatMessage("Not connected");
+				CChat::Get()->AddChatMessage("Not connected: " + Address() + " did not answer. Is the server running?", { 255, 0, 0, 255 });
+				bConnected = false;
+				bEstablished = false;
+				CGlobals::Get().displayServerBrowser = true;
 				break;
 			}
 			case ID_NO_FREE_INCOMING_CONNECTIONS:
@@ -82,14 +112,17 @@ void CNetworkConnection::Tick()
 			}
 			case ID_DISCONNECTION_NOTIFICATION:
 			{
+				log_info << "Network: the server closed the connection" << std::endl;
 				CLocalPlayer::Get()->SetMoney(0);
-
+				bEstablished = false;
 				CChat::Get()->AddChatMessage("Connection closed!");
 				break;
 			}
 			case ID_CONNECTION_LOST:
 			{
+				log_error << "Network: connection to " << Address() << " lost" << std::endl;
 				CLocalPlayer::Get()->SetMoney(0);
+				bEstablished = false;
 				CChat::Get()->AddChatMessage("Connection Lost!");
 				break;
 			}
@@ -101,6 +134,7 @@ void CNetworkConnection::Tick()
 			}
 			case ID_CONNECT_TO_SERVER:
 			{
+				log_info << "Network: the server accepted the player, synchronisation starts" << std::endl;
 				bEstablished = true;
 				break;
 			}

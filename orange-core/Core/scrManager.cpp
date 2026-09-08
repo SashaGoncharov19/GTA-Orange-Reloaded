@@ -195,6 +195,17 @@ static void ReportMissingHandler(uint64_t hash)
 		<< std::dec << std::nouppercase << ") in the registration table; the call returns zero" << std::endl;
 }
 
+// The game's native threw (structured exception); the call is abandoned and
+// whatever the result slot holds is returned. Both hashes are printed so that
+// the line can be matched against Natives.h (canonical) and the crossmap.
+static void ReportNativeException(uint64_t hash)
+{
+	uint64_t translated = hash;
+	NativeTable::Translate(hash, translated);
+	log_error << "Natives: exception inside native 0x" << std::hex << std::uppercase << hash << " (called as 0x" << translated
+		<< std::dec << std::nouppercase << "); the call was abandoned" << std::endl;
+}
+
 uint64_t * nativeCall()
 {
 	auto fn = ScriptEngine::GetNativeHandler(g_hash);
@@ -205,7 +216,7 @@ uint64_t * nativeCall()
 			fn(&g_context);
 		}
 		__except (EXCEPTION_EXECUTE_HANDLER) {
-			log_error << "Error in nativeCall. 0x" << g_hash << std::endl;
+			ReportNativeException(g_hash);
 		}
 	}
 	return reinterpret_cast<uint64_t*>(g_context.GetResultPointer());
@@ -224,10 +235,25 @@ void keyboardHandlerUnregister(TKeyboardFn function)
 	g_keyboardFunctions.erase(function);
 }
 
+// While an ImGui text field has the focus (nickname or address in the server
+// browser, the chat line) the letters typed there are not hotkeys: T would
+// open the chat over the browser, G toggles the passenger flag. Escape, Enter
+// and the function keys still reach the handlers.
+static bool TypingInTextField(WPARAM key)
+{
+	if (!ImGui::GetIO().WantTextInput)
+		return false;
+	if (key == VK_ESCAPE || key == VK_RETURN || (key >= VK_F1 && key <= VK_F24))
+		return false;
+	return true;
+}
+
 void ScriptManager::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	if (uMsg == WM_KEYDOWN || uMsg == WM_KEYUP || uMsg == WM_SYSKEYDOWN || uMsg == WM_SYSKEYUP)
 	{
+		if (TypingInTextField(wParam))
+			return;
 		auto functions = g_keyboardFunctions;
 		for (auto & function : functions)
 			function((DWORD)wParam, lParam & 0xFFFF, (lParam >> 16) & 0xFF, (lParam >> 24) & 1, (uMsg == WM_SYSKEYDOWN || uMsg == WM_SYSKEYUP), (lParam >> 30) & 1, (uMsg == WM_SYSKEYUP || uMsg == WM_KEYUP));
