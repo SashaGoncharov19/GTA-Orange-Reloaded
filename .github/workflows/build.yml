@@ -209,6 +209,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: gta-orange-*
           merge-multiple: true
 
       - name: List downloads
@@ -290,8 +291,13 @@ jobs:
             type=sha
 
       - uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           push: true
+          build-args: |
+            ORANGE_VERSION_STRING=${{ steps.image.outputs.release || format('nightly-{0}', github.sha) }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

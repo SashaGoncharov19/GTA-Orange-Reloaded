@@ -10,8 +10,10 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY . .
+ARG ORANGE_VERSION_STRING=0.2.0-docker
 RUN cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-      -DORANGE_BUILD_CLIENT=OFF -DORANGE_BUILD_TOOLS=OFF \
+      -DORANGE_BUILD_CLIENT=OFF -DORANGE_BUILD_TOOLS=OFF -DORANGE_BUILD_TESTS=OFF \
+      -DORANGE_VERSION_STRING="$ORANGE_VERSION_STRING" \
  && cmake --build build --parallel \
  && cmake --install build --prefix /opt/gta-orange --component server
 
