@@ -176,8 +176,9 @@ the DLL into a game that already has it does nothing).
      outside GTA:Orange.
    * The game starts → one of our changes is responsible; continue.
 2. **`orange.storymode`**. The stock single player scripts keep running
-   instead of being frozen. If this makes the difference, the game needs its
-   own scripts to finish starting up.
+   after the game has booted instead of being frozen then (they always run
+   during the boot itself). If this makes the difference, something in the
+   take-over goes wrong on this build.
 3. **Turn the hooks off one at a time** in `offsets.ini`:
 
    ```ini

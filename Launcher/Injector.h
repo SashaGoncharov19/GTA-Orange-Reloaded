@@ -30,6 +30,9 @@ public:
 	void RunSteam();
 	// Waits until GTA5.exe shows up in the process list. Returns false on timeout.
 	bool WaitUntilGameStarts(int timeoutSeconds);
+	// Waits until the game has created its window and then delaySeconds more,
+	// without opening the process. Returns false when the game exits meanwhile.
+	bool WaitForGameWindow(int delaySeconds, int timeoutSeconds);
 	// Injects all pushed libraries into the running GTA5.exe. Returns false on failure.
 	bool InjectAll(bool waitForUnpack = true, int unpackTimeoutSeconds = 120);
 	// Writes the in-memory (unpacked) image of GTA5.exe to <outputDir>\GTA5-<version>.dump.exe

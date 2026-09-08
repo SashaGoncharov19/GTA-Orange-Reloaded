@@ -84,6 +84,7 @@ struct LaunchOptions
 	bool afterUpdate = false;     // --updated (internal: just restarted after a self-update)
 	std::wstring channel;         // --channel stable|nightly (overrides launcher.xml)
 	bool waitForUnpack = true;
+	int injectAfterSeconds = 45;  // --inject-after SEC: wait for the game window, then this long, before touching the process (0 = inject right after unpack)
 	bool forceSteam = false;
 	bool forceDirect = false;
 	int timeoutSeconds = 600;
@@ -102,6 +103,8 @@ static void ShowUsage()
 		L"  --steam             start the game through Steam (steam://run/271590)\n"
 		L"  --direct            start GTA5.exe directly\n"
 		L"  --no-unpack-wait    do not wait for the executable to be unpacked before injecting\n"
+		L"  --inject-after SEC  wait for the game window and SEC more seconds before injecting (default 45;\n"
+		L"                      0 = inject right after the executable is unpacked, as before)\n"
 		L"  --timeout <sec>     how long to wait for GTA5.exe (default 600)\n"
 		L"  --dump-game         write the unpacked GTA5.exe image (for IDA / Ghidra) next to the launcher and exit\n"
 		L"  --no-update         skip the update check\n"
@@ -126,6 +129,8 @@ static bool ParseCommandLine(LaunchOptions& options)
 			options.injectOnly = true;
 		else if (arg == L"--no-unpack-wait")
 			options.waitForUnpack = false;
+		else if (arg == L"--inject-after" && i + 1 < argc)
+			options.injectAfterSeconds = _wtoi(argv[++i]);
 		else if (arg == L"--steam")
 			options.forceSteam = true;
 		else if (arg == L"--direct")
@@ -303,6 +308,7 @@ void LaunchGame()
 		LauncherLog(L"command line: " + std::wstring(GetCommandLineW()));
 		LauncherLog("mode: " + std::string(g_options.dumpGame ? "dump the unpacked GTA5.exe image (--dump-game)" : g_options.injectOnly ? "inject into a running GTA5.exe (--inject)" : "start the game and inject")
 			+ ", wait for unpack: " + BoolText(g_options.waitForUnpack)
+			+ ", inject after the game window: " + std::to_string(g_options.injectAfterSeconds) + "s"
 			+ ", timeout: " + std::to_string(g_options.timeoutSeconds) + "s"
 			+ ", update check: " + BoolText(g_options.checkUpdates && !g_options.afterUpdate));
 		Updater::CleanupAfterRestart(orangeDir);
@@ -452,6 +458,14 @@ void LaunchGame()
 			}
 			Fail((L"Dumping GTA5.exe failed:\n" + FromUtf8(error.c_str())).c_str());
 		}
+		// Leave the game alone while it starts up (Social Club initialisation,
+		// see Injector::WaitForGameWindow); everything below opens the process.
+		if (g_options.injectAfterSeconds > 0)
+		{
+			SetSplashStatus(L"Waiting for the game to finish starting...");
+			if (!Injector::Get().WaitForGameWindow(g_options.injectAfterSeconds, g_options.timeoutSeconds))
+				Fail(L"GTA5.exe exited before orange-core.dll could be injected. The game itself did not start\n(see launcher.log); nothing was injected.");
+		}
 		// The natives crossmap for this game version (natives-<version>.txt) is
 		// generated from FiveM's public table when it is missing; without it
 		// orange-core cannot call natives on a build newer than the reference one.
@@ -475,7 +489,10 @@ void LaunchGame()
 		// A game we attach to (--inject) has been running for a while and is
 		// unpacked long ago; keep the wait short there, the full 2 minutes
 		// only make sense for a process the launcher just started itself.
-		if (!Injector::Get().InjectAll(g_options.waitForUnpack && !isPirate, g_options.injectOnly ? 20 : 120))
+		// After the window wait the executable has been unpacked for a long
+		// time; polling its memory for that would only hold a handle for nothing.
+		bool waitForUnpack = g_options.waitForUnpack && !isPirate && g_options.injectAfterSeconds <= 0;
+		if (!Injector::Get().InjectAll(waitForUnpack, g_options.injectOnly ? 20 : 120))
 		{
 			LauncherLog("injection FAILED, see above; the game keeps running without GTA:Orange");
 			TerminateProcess(GetCurrentProcess(), 1);

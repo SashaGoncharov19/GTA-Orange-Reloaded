@@ -68,9 +68,27 @@ bool ScriptEngine::IsOwnedThread(scrThread * thread)
 	return g_ownedThreads.find((ScriptThread*)thread) != g_ownedThreads.end();
 }
 
+static bool g_tookOver = false;
+
 bool ScriptEngine::StockScriptsAllowed()
 {
-	return CGlobals::Get().storyMode;
+	return CGlobals::Get().storyMode || !g_tookOver;
+}
+
+void ScriptEngine::TakeOver()
+{
+	if (g_tookOver)
+		return;
+	g_tookOver = true;
+	if (CGlobals::Get().storyMode)
+		log_info << "Script engine: the game has booted; the client scripts start, the stock scripts keep running (orange.storymode)" << std::endl;
+	else
+		log_info << "Script engine: the game has booted; GTA:Orange takes over, the stock single player scripts are frozen from now on" << std::endl;
+}
+
+bool ScriptEngine::TookOver()
+{
+	return g_tookOver;
 }
 
 bool ScriptEngine::ThreadCollectionReady()
@@ -227,7 +245,9 @@ ScriptEngine::NativeHandler ScriptEngine::GetNativeHandler(uint64_t hash)
 
 // GtaThread::Tick: our own threads run through Run(); every other thread is
 // left in its current state, so the stock single player scripts never
-// execute (unless orange.storymode allows them).
+// execute - but only once GTA:Orange has taken over (ScriptEngine::TakeOver),
+// i.e. after the game booted with its own scripts; before that, and always
+// with orange.storymode, every thread runs as the game intends.
 typedef eThreadState(*ThreadTick_t)(ScriptThread * thread, uint32_t opsToExecute);
 static ThreadTick_t g_origThreadTick = nullptr;
 
@@ -235,7 +255,7 @@ static eThreadState ThreadTickHook(ScriptThread * thread, uint32_t opsToExecute)
 {
 	if (g_ownedThreads.find(thread) != g_ownedThreads.end())
 		return thread->Run(0);
-	if (CGlobals::Get().storyMode)
+	if (ScriptEngine::StockScriptsAllowed())
 		return g_origThreadTick(thread, opsToExecute);
 	return thread->GetContext()->m_State;
 }
@@ -248,7 +268,7 @@ static ScriptIdCompare_t g_origScriptIdCompare = nullptr;
 
 static int ScriptIdCompareHook(void * a, void * b)
 {
-	if (CGlobals::Get().storyMode)
+	if (ScriptEngine::StockScriptsAllowed())
 		return g_origScriptIdCompare(a, b);
 	return 1;
 }
@@ -259,7 +279,8 @@ bool ScriptEngine::InstallHooks()
 	if (GameOffsets::IsResolved("ScriptThreadTick"))
 	{
 		if (HookGameFunction("ScriptThreadTick", (void*)ThreadTickHook, (void**)&g_origThreadTick))
-			log_info << "Script hooks: stock scripts " << (CGlobals::Get().storyMode ? "allowed (orange.storymode)" : "frozen, only GTA:Orange threads run") << std::endl;
+			log_info << "Script hooks: the stock scripts run until the game has booted"
+				<< (CGlobals::Get().storyMode ? " and keep running afterwards (orange.storymode)" : ", then only GTA:Orange threads run") << std::endl;
 		else
 			ok = false;
 	}
