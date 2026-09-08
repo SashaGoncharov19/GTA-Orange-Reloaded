@@ -125,7 +125,7 @@ eThreadState ScriptManagerThread::Reset(uint32_t scriptHash, void * pArgs, uint3
 
 void ScriptManagerThread::AddScript(std::string threadName, void(*fn)())
 {
-	log_debug << "Registering thread " << threadName.c_str() << " 0x" << std::hex << fn << std::endl;
+	log_debug << "Registering thread " << threadName.c_str() << " 0x" << std::hex << fn << std::dec << std::endl;
 	if (m_scripts.find(threadName) != m_scripts.end()) 
 	{
 		log_error << "Thread " << threadName.c_str() << " is already registered" << std::endl;

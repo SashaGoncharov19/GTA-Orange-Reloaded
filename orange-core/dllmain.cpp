@@ -69,6 +69,19 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 			<< (CGlobals::Get().isDeveloper ? " (developer mode)" : "") << (CGlobals::Get().storyMode ? " (story mode)" : "")
 			<< (CGlobals::Get().noHooks ? " (orange.nohooks: nothing will be patched or hooked)" : "") << std::endl;
 
+		// A second copy of orange-core.dll in the same game (the file was
+		// replaced by an update while the old one stayed mapped, then injected
+		// again) would hook the hooks of the first: stay inactive instead.
+		HMODULE first = GetModuleHandleW(L"orange-core.dll");
+		if (first && first != hModule)
+		{
+			log_error << "Another orange-core.dll is already loaded in this game (module 0x" << std::hex << (uintptr_t)first << std::dec
+				<< "); this copy stays inactive. Restart GTA V to load the current build." << std::endl;
+			MessageBoxA(NULL, "orange-core.dll is already loaded in this GTA V (an older copy).\n\nThis copy stays inactive. Restart GTA V to load the current build.",
+				"GTA:Orange", MB_OK | MB_ICONWARNING);
+			break;
+		}
+
 		bool patched = PreLoadPatches();
 		// The natives the game registered are dumped from OnGameReady (see
 		// orange-core.cpp): injection happens during the first loading screen,
