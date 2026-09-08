@@ -6,7 +6,7 @@
 //
 //   version 0.2.0
 //   file orange-core.dll <sha256 hex> <size in bytes>
-//   file Launcher.exe    <sha256 hex> <size in bytes>
+//   file OrangeLauncher.exe    <sha256 hex> <size in bytes>
 
 #pragma once
 

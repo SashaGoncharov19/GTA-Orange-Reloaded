@@ -2,7 +2,7 @@
 <!-- GTA:Orange launcher settings -->
 <launcher>
     <!--
-        Automatic updates, checked every time Launcher.exe starts:
+        Automatic updates, checked every time OrangeLauncher.exe starts:
           enabled     true / false
           channel     stable  = the latest GitHub release
                       nightly = the latest build of the master branch
@@ -10,10 +10,10 @@
                       builds follow nightly, releases follow stable)
           repository  GitHub repository that publishes the releases
         A build never switches channels on its own. To move an installation
-        to the other channel run once:  Launcher.exe --channel nightly --update
+        to the other channel run once:  OrangeLauncher.exe --channel nightly --update
         (or --channel stable --update).
         Other command line overrides: --no-update, --update.
-        Details are written to launcher.log next to Launcher.exe.
+        Details are written to launcher.log next to OrangeLauncher.exe.
     -->
     <updates enabled="true" repository="SashaGoncharov19/GTA-Orange-Reloaded" />
 </launcher>

@@ -9,10 +9,10 @@
 // pre-release = nightly channel) publishes client-manifest.txt plus the
 // individual client files. Before the game is started the launcher downloads
 // the manifest, compares SHA-256 hashes with the local files and replaces the
-// ones that differ. Launcher.exe replaces itself by renaming the running
-// executable to Launcher.exe.old and restarts afterwards.
+// ones that differ. OrangeLauncher.exe replaces itself by renaming the running
+// executable to OrangeLauncher.exe.old and restarts afterwards.
 //
-// Settings come from launcher.xml next to Launcher.exe (see runtime/client)
+// Settings come from launcher.xml next to OrangeLauncher.exe (see runtime/client)
 // and can be overridden with --no-update / --update / --channel <name>.
 //
 // A build never changes channel on its own: a nightly build only follows the
@@ -33,7 +33,7 @@ enum class UpdateResult
 {
 	UpToDate,
 	Updated,           // files replaced, no restart needed
-	RestartRequired,   // Launcher.exe itself was replaced
+	RestartRequired,   // OrangeLauncher.exe itself was replaced
 	Skipped,           // disabled or development build
 	Failed             // network / verification problem, game start continues
 };
@@ -49,7 +49,7 @@ public:
 	const std::string& LastError() const { return m_error; }
 	const std::string& RemoteVersion() const { return m_remoteVersion; }
 
-	// Removes Launcher.exe.old left behind by a self-update.
+	// Removes OrangeLauncher.exe.old left behind by a self-update.
 	static void CleanupAfterRestart(const std::wstring& installDir);
 
 	// One-off HTTPS download (used for the natives crossmap). Returns false
