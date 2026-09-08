@@ -68,6 +68,56 @@ bool ScriptEngine::IsOwnedThread(scrThread * thread)
 	return g_ownedThreads.find((ScriptThread*)thread) != g_ownedThreads.end();
 }
 
+const char * ScriptEngine::ThreadName(ScriptThread * thread)
+{
+	if (!thread)
+		return "";
+	return (const char*)thread + (ScriptHandlerOffset() >= 0x118 ? 0xD4 : 0xD0);
+}
+
+// The stock scripts that keep running (the 2017 list in GtaScripts.cpp):
+// HUD helpers that belong to no story. Every other stock script is cleaned
+// up and terminated at the take-over, and one the game starts later stays
+// frozen.
+static const char * const kKeptStockScripts[] = { "ingamehud", "blip_controller", "timershud", "hud_creator", nullptr };
+
+static bool IsKeptStockScript(ScriptThread * thread)
+{
+	const char * name = ScriptEngine::ThreadName(thread);
+	for (const char * const * kept = kKeptStockScripts; *kept; ++kept)
+		if (_stricmp(name, *kept) == 0)
+			return true;
+	return false;
+}
+
+// Cleans up and terminates every living stock script by name, the game's own
+// way (FORCE_CLEANUP with the flags the 2017 client used, then TERMINATE):
+// their blips, markers and mission state go with them. Runs on the script
+// thread, these are natives.
+static void TerminateStockScripts()
+{
+	if (!scrThreadCollection)
+		return;
+	std::set<std::string> names;
+	for (uint16_t i = 0; i < (uint16_t)scrThreadCollection->count(); i++)
+	{
+		ScriptThread * thread = scrThreadCollection->at(i);
+		if (!thread || ScriptEngine::IsOwnedThread(thread) || IsKeptStockScript(thread))
+			continue;
+		const char * name = ScriptEngine::ThreadName(thread);
+		if (name[0] && strnlen(name, 64) < 64)
+			names.insert(name);
+	}
+	std::string list;
+	for (const std::string & name : names)
+	{
+		PLAYER::FORCE_CLEANUP_FOR_ALL_THREADS_WITH_THIS_NAME((char*)name.c_str(), 8);
+		GAMEPLAY::TERMINATE_ALL_SCRIPTS_WITH_THIS_NAME((char*)name.c_str());
+		list += (list.empty() ? "" : ", ") + name;
+	}
+	log_info << "Script engine: " << names.size() << " stock script(s) cleaned up and terminated" << (list.empty() ? std::string() : ": " + list) << std::endl;
+}
+
 static bool g_tookOver = false;
 
 bool ScriptEngine::StockScriptsAllowed()
@@ -81,9 +131,12 @@ void ScriptEngine::TakeOver()
 		return;
 	g_tookOver = true;
 	if (CGlobals::Get().storyMode)
+	{
 		log_info << "Script engine: the game has booted; the client scripts start, the stock scripts keep running (orange.storymode)" << std::endl;
-	else
-		log_info << "Script engine: the game has booted; GTA:Orange takes over, the stock single player scripts are frozen from now on" << std::endl;
+		return;
+	}
+	log_info << "Script engine: the game has booted; GTA:Orange takes over, the stock single player scripts are terminated" << std::endl;
+	TerminateStockScripts();
 }
 
 bool ScriptEngine::TookOver()
@@ -255,7 +308,7 @@ static eThreadState ThreadTickHook(ScriptThread * thread, uint32_t opsToExecute)
 {
 	if (g_ownedThreads.find(thread) != g_ownedThreads.end())
 		return thread->Run(0);
-	if (ScriptEngine::StockScriptsAllowed())
+	if (ScriptEngine::StockScriptsAllowed() || IsKeptStockScript(thread))
 		return g_origThreadTick(thread, opsToExecute);
 	return thread->GetContext()->m_State;
 }

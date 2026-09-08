@@ -35,6 +35,8 @@ public:
 	static int ScriptHandlerOffset();
 	// Writes the script name (and, on 1.0.2699+, its hash) into the thread object.
 	static void SetThreadName(ScriptThread * thread, const char * name);
+	// The script name stored in the thread object (empty for a free slot).
+	static const char * ThreadName(ScriptThread * thread);
 	static bool IsOwnedThread(scrThread * thread);
 	// True while the stock single player scripts may run: always with
 	// orange.storymode, otherwise until TakeOver().
