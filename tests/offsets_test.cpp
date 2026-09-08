@@ -147,6 +147,27 @@ int main()
 		CHECK(s.Parse("E8 ? ? ? ? 8B CB"));
 		CHECK(s.kind == OffsetSpec::Pattern && s.delta == 0);
 
+		// Several candidates separated by '|', each with its own delta.
+		CHECK(s.Parse("48 8B C8 EB ? 33 C9 48 8B 05 @ 7 | 48 8B C8 EB 03 49 8B CD 48 8B 05 @ 8 | 89 15 ? ? ? ? 48 8B 0C D8", &err));
+		CHECK(s.kind == OffsetSpec::Pattern);
+		CHECK(s.candidates.size() == 3);
+		if (s.candidates.size() == 3)
+		{
+			CHECK(s.candidates[0].delta == 7 && s.candidates[0].pattern.Length() == 10);
+			CHECK(s.candidates[1].delta == 8 && s.candidates[1].pattern.Length() == 11);
+			CHECK(s.candidates[2].delta == 0 && s.candidates[2].pattern.Length() == 10);
+		}
+		CHECK(s.pattern.Length() == 10 && s.delta == 7);
+		CHECK(!s.Parse("48 8B | ", &err));
+		CHECK(!s.Parse("48 8B | ZZ", &err));
+		CHECK(!s.Parse("48 8B @ 1 | 90 @ x", &err));
+
+		std::vector<PatternCandidate> c;
+		CHECK(ParsePatternCandidates("FF 0D ? ? ? ? 48 8B F9", -4, c) && c.size() == 1 && c[0].delta == -4);
+		CHECK(ParsePatternCandidates("AA @ 1 | BB", 5, c) && c.size() == 2 && c[0].delta == 1 && c[1].delta == 5);
+		CHECK(!ParsePatternCandidates("", 0, c));
+		CHECK(!ParsePatternCandidates("|", 0, c));
+
 		CHECK(!s.Parse("", &err));
 		CHECK(!s.Parse("0xZZ", &err));
 		CHECK(!err.empty());

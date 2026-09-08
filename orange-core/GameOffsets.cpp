@@ -98,13 +98,25 @@ static const Entry g_entries[] = {
 	{ "SnowPatch",                        0x4E1FA4,  NULL, 0, OPT, "20 bytes nopped by the /snow debug command" },
 
 	// --- script engine (Core/scrEngine.cpp, Core/scrThread.cpp) ---------------
-	{ "ScrThreadCollection",              0x9DF347,  "48 8B C8 EB 03 48 8B CB 48 8B 05", 8, REQ, "'mov rax, [rip+X]' loading the script thread collection; rel32 at +3 (unverified pattern; original code: 0x9DF33F + 8)" },
-	{ "ActiveThreadTlsOffset",            0x14AE8E9, "48 8B 04 D0 4A 8B 14 00 48 8B 01 F3 0F 10 40 20", -4, REQ, "32-bit immediate: TLS offset of the active script thread (unverified pattern; original code: 0x14AE8ED - 4)" },
-	{ "ScrThreadId",                      0x30A9E0B, "89 15 ? ? ? ? 48 8B 0C D8", 0, REQ, "'mov [rip+X], edx' writing the next script thread id; rel32 at +2 (unverified pattern; original code: 0x30A9E04 + 7)" },
-	{ "ScrThreadCount",                   0x14AFE13, "FF 0D ? ? ? ? 48 8B F9", 0, REQ, "'dec dword [rip+X]' of the script thread count; rel32 at +2 (unverified pattern)" },
+	// Alternates for the script engine come from FiveM's rage-scripting-five
+	// (scrEngine.cpp), which keeps one variant per family of game builds.
+	// FiveM points at the rel32 itself; our code points at the instruction
+	// (getOffset(3) / getOffset(2)), hence the deltas differ from theirs.
+	{ "ScrThreadCollection",              0x9DF347,
+	  "48 8B C8 EB ? 33 C9 48 8B 05 @ 7 | 48 8B C8 EB 03 49 8B CD 48 8B 05 @ 8 | 48 8B C8 EB 03 48 8B CB 48 8B 05 @ 8", 8, REQ,
+	  "'mov rax, [rip+X]' loading the script thread collection; rel32 at +3 (patterns from FiveM/ScriptHookV-style hooks, unverified; original code: 0x9DF33F + 8)" },
+	{ "ActiveThreadTlsOffset",            0x14AE8E9,
+	  "48 8B 04 D0 4A 8B 14 00 48 8B 01 F3 44 0F 2C 42 20 @ -4 | 48 8B 04 D0 4A 8B 14 00 48 8B 01 F3 0F 10 40 20 @ -4", -4, REQ,
+	  "32-bit immediate: TLS offset of the active script thread (patterns from FiveM-style hooks, unverified; original code: 0x14AE8ED - 4)" },
+	{ "ScrThreadId",                      0x30A9E0B,
+	  "8B 15 ? ? ? ? 48 8B 05 ? ? ? ? FF C2 89 15 ? ? ? ? 48 8B 0C F8 @ 0 | 8B 15 ? ? ? ? 48 8B 05 ? ? ? ? FF C2 89 15 ? ? ? ? 48 8B 0C D8 @ 0 | 8B 15 ? ? ? ? 48 8B 05 ? ? ? ? FF C2 89 15 ? ? ? ? E9 @ 0 | 8B 15 ? ? ? ? 48 8B 05 ? ? ? ? FF C2 89 @ 0 | 89 15 ? ? ? ? 48 8B 0C D8 @ 0", 0, REQ,
+	  "'mov edx, [rip+X]' / 'mov [rip+X], edx' of the next script thread id; rel32 at +2 (patterns from FiveM-style hooks, unverified; original code: 0x30A9E04 + 7)" },
+	{ "ScrThreadCount",                   0x14AFE13,
+	  "FF 0D ? ? ? ? 48 8B D9 75 @ 0 | FF 0D ? ? ? ? 48 8B F9 @ 0", 0, REQ,
+	  "'dec dword [rip+X]' of the script thread count; rel32 at +2 (patterns from FiveM-style hooks, unverified)" },
 	{ "RegistrationTable",                0x14B1A55, "76 61 49 8B 7A 40 48 8D 0D", 6, REQ, "'lea rcx, [rip+X]' of the native registration table; rel32 at +3 (unverified pattern; original code: 0x14B1A4F + 6)" },
 	{ "ScriptHandlerMgr",                 0x9ED224,  "74 17 48 8B C8 E8 ? ? ? ? 48 8D 0D", 10, REQ, "'lea rcx, [rip+X]' of the script handler manager; rel32 at +3 (unverified pattern; original code: 0x9ED21A + 10)" },
-	{ "GetScriptIdBlock",                 0x14B4CCA, "74 3C 48 8B 01 FF 50 10 84 C0", 0, REQ, "ERR_SYS_PURE check; the two bytes at +4 are inspected (unverified pattern)" },
+	{ "GetScriptIdBlock",                 0x14B4CCA, "74 41 48 8B 01 FF 50 10 84 C0 @ 0 | 74 3C 48 8B 01 FF 50 10 84 C0 @ 0", 0, REQ, "ERR_SYS_PURE check; the two bytes at +4 are inspected (patterns from FiveM-style hooks, unverified)" },
 	{ "ScriptThreadTick",                 0x9F645C,  "80 B9 46 01 00 00 00 8B FA 48 8B D9 74 05", -0xF, REQ, "eThreadState __thiscall(scrThread*, uint32 opsToExecute) (unverified pattern; original code: 0x9F646B - 0xF)" },
 	{ "ScriptThreadKill",                 0x9ECF6C,  "48 83 EC 20 48 83 B9 ? 01 00 00 00 48 8B D9 74 14", -6, REQ, "void __thiscall(scrThread*) (unverified pattern; original code: 0x9ECF72 - 6)" },
 	{ "ScriptThreadInit",                 0x9EB4DC,  NULL, 0, REQ, "void __thiscall(scrThread*); initialises a freshly reset script thread" },
@@ -262,6 +274,37 @@ static bool MatchesAt(const BytePattern& pattern, uintptr_t rva)
 	return SafeMatch(&pattern, (const uint8_t*)(g_base + rva));
 }
 
+// Tries the candidates in order; the first one that matches exactly once
+// wins. `note` explains the outcome either way.
+static bool ScanCandidates(const std::vector<orange::PatternCandidate>& candidates, uintptr_t& rvaOut, std::string& note)
+{
+	size_t notFound = 0, ambiguous = 0;
+	for (size_t i = 0; i < candidates.size(); ++i)
+	{
+		uintptr_t rva = 0;
+		size_t matches = ScanPattern(candidates[i].pattern, candidates[i].delta, rva);
+		if (matches == 1)
+		{
+			rvaOut = rva;
+			note = candidates.size() > 1
+				? "pattern #" + std::to_string(i + 1) + " of " + std::to_string(candidates.size())
+				: std::string("pattern");
+			return true;
+		}
+		if (matches == 0)
+			++notFound;
+		else
+			++ambiguous;
+	}
+	if (candidates.empty())
+		note = "no pattern";
+	else if (ambiguous)
+		note = std::to_string(ambiguous) + " pattern(s) ambiguous, " + std::to_string(notFound) + " not found, refusing to guess";
+	else
+		note = std::to_string(notFound) + " pattern(s) not found";
+	return false;
+}
+
 static std::string ReadFileVersion(const std::string& path)
 {
 	DWORD handle = 0;
@@ -296,13 +339,13 @@ static bool DetectReferenceBuild()
 	for (const char* name : g_referenceSignatures)
 	{
 		const Entry* entry = FindEntry(name);
-		BytePattern pattern;
-		if (!entry || !entry->pattern || !pattern.Parse(entry->pattern))
+		std::vector<orange::PatternCandidate> candidates;
+		if (!entry || !entry->pattern || !orange::ParsePatternCandidates(entry->pattern, entry->patternDelta, candidates))
 		{
 			all = false;
 			continue;
 		}
-		if (!MatchesAt(pattern, entry->referenceRva))
+		if (!MatchesAt(candidates[0].pattern, entry->referenceRva - candidates[0].delta))
 		{
 			log_info << "Reference signature " << name << " does not match at GTA5.exe+" << HexString(entry->referenceRva) << std::endl;
 			all = false;
@@ -359,35 +402,27 @@ static bool ApplyIniValue(Status& status, const std::string& value, const std::s
 	case OffsetSpec::Scan:
 	case OffsetSpec::Pattern:
 	{
-		BytePattern pattern;
-		int delta = 0;
+		std::vector<orange::PatternCandidate> candidates;
 		if (spec.kind == OffsetSpec::Pattern)
+			candidates = spec.candidates;
+		else if (!status.entry->pattern || !orange::ParsePatternCandidates(status.entry->pattern, status.entry->patternDelta, candidates))
 		{
-			pattern = spec.pattern;
-			delta = spec.delta;
-		}
-		else if (!status.entry->pattern || !pattern.Parse(status.entry->pattern))
-		{
-			log_error << "offsets.ini [" << section << "] " << status.entry->name << ": 'scan' requested but orange-core has no pattern for it" << std::endl;
+			log_error << "offsets.ini [" << section << "] " << status.entry->name << ": 'scan' requested but orange-core has no usable pattern for it" << std::endl;
 			status.note = "no built-in pattern to scan for";
 			return true;
 		}
-		else
-			delta = status.entry->patternDelta;
 
 		uintptr_t rva = 0;
-		size_t matches = ScanPattern(pattern, delta, rva);
-		if (matches == 0)
+		std::string note;
+		if (!ScanCandidates(candidates, rva, note))
 		{
-			log_error << "offsets.ini [" << section << "] " << status.entry->name << ": pattern '" << pattern.ToString() << "' not found" << std::endl;
-			status.note = "pattern from offsets.ini not found";
+			log_error << "offsets.ini [" << section << "] " << status.entry->name << ": " << note << std::endl;
+			status.note = "offsets.ini: " + note;
 			return true;
 		}
-		if (matches > 1)
-			log_error << "offsets.ini [" << section << "] " << status.entry->name << ": pattern '" << pattern.ToString() << "' is ambiguous, using the first match" << std::endl;
 		status.source = Source::Scan;
 		status.rva = rva;
-		status.note = std::string("pattern from offsets.ini [") + section + "]" + (matches > 1 ? " (ambiguous!)" : "");
+		status.note = std::string("offsets.ini [") + section + "] " + note;
 		return true;
 	}
 	}
@@ -408,22 +443,23 @@ static void ResolveWithBuiltins(Status& status)
 
 	if (entry.pattern)
 	{
-		BytePattern pattern;
-		if (!pattern.Parse(entry.pattern))
+		std::vector<orange::PatternCandidate> candidates;
+		std::string error;
+		if (!orange::ParsePatternCandidates(entry.pattern, entry.patternDelta, candidates, &error))
 		{
-			status.note = "built-in pattern is malformed";
+			status.note = "built-in pattern is malformed: " + error;
 			return;
 		}
 		uintptr_t rva = 0;
-		size_t matches = ScanPattern(pattern, entry.patternDelta, rva);
-		if (matches == 1)
+		std::string note;
+		if (ScanCandidates(candidates, rva, note))
 		{
 			status.source = Source::Scan;
 			status.rva = rva;
-			status.note = "built-in pattern";
+			status.note = "built-in " + note;
 			return;
 		}
-		status.note = matches == 0 ? "built-in pattern not found" : "built-in pattern is ambiguous, refusing to guess";
+		status.note = "built-in " + note;
 		return;
 	}
 
@@ -439,18 +475,18 @@ static void VerifyPatternsAgainstReference()
 		const Entry& entry = g_entries[i];
 		if (!entry.pattern || !entry.referenceRva)
 			continue;
-		BytePattern pattern;
-		if (!pattern.Parse(entry.pattern))
+		std::vector<orange::PatternCandidate> candidates;
+		if (!orange::ParsePatternCandidates(entry.pattern, entry.patternDelta, candidates))
 			continue;
 		uintptr_t rva = 0;
-		size_t matches = ScanPattern(pattern, entry.patternDelta, rva);
-		if (matches == 1 && rva == entry.referenceRva)
-			log_info << "pattern check " << entry.name << ": OK" << std::endl;
-		else if (matches == 0)
-			log_error << "pattern check " << entry.name << ": NOT FOUND" << std::endl;
+		std::string note;
+		if (ScanCandidates(candidates, rva, note) && rva == entry.referenceRva)
+			log_info << "pattern check " << entry.name << ": OK (" << note << ")" << std::endl;
+		else if (rva)
+			log_error << "pattern check " << entry.name << ": MISMATCH, " << note << " found " << HexString(rva)
+				<< ", reference " << HexString(entry.referenceRva) << std::endl;
 		else
-			log_error << "pattern check " << entry.name << ": " << (matches > 1 ? "AMBIGUOUS, first match " : "MISMATCH, found ")
-				<< HexString(rva) << ", reference " << HexString(entry.referenceRva) << std::endl;
+			log_error << "pattern check " << entry.name << ": " << note << std::endl;
 	}
 }
 
@@ -668,7 +704,12 @@ bool WriteTemplate(const std::string& path)
 			if (s.entry->referenceRva)
 				out << ";   reference build: " << HexString(s.entry->referenceRva) << "\n";
 			if (s.entry->pattern)
-				out << ";   built-in pattern: " << s.entry->pattern << " @ " << s.entry->patternDelta << "\n";
+			{
+				out << ";   built-in pattern(s): " << s.entry->pattern;
+				if (!strchr(s.entry->pattern, '@'))
+					out << " @ " << s.entry->patternDelta;
+				out << "\n";
+			}
 			switch (s.source)
 			{
 			case Source::Disabled:

@@ -72,9 +72,22 @@ SnowPatch = disabled
 ```
 
 Names are case insensitive. Patterns are hex bytes separated by spaces, `?`
-(or `??`) is a wildcard; the value is the address of the first match plus the
-delta. A pattern that matches more than once is reported as ambiguous and the
-first match is used, so prefer unique patterns.
+(or `??`) is a wildcard; the value is the address of the match plus the delta.
+A pattern must match exactly once: an ambiguous pattern is refused, so prefer
+unique patterns. Several candidates can be given separated by `|`, each with
+its own `@ delta`; they are tried in order and the first unique match wins.
+This mirrors how FiveM handles the same globals across game builds:
+
+```ini
+ScrThreadCollection = 48 8B C8 EB ? 33 C9 48 8B 05 @ 7 | 48 8B C8 EB 03 49 8B CD 48 8B 05 @ 8
+```
+
+The built-in table uses the same syntax for the script-engine entries; their
+alternates were taken from FiveM's `rage-scripting-five` (`scrEngine.cpp`).
+Mind the delta convention: FiveM points at the rel32 displacement itself,
+orange-core points at the instruction (`getOffset(3)` for a 3-byte opcode
+such as `48 8B 05`, `getOffset(2)` for `FF 0D` / `8B 15`), so orange-core's
+delta is FiveM's minus the opcode length.
 
 The address that has to be given is always the one orange-core **uses**:
 the start of a function that is called or replaced by `ret`, the first byte
