@@ -166,3 +166,27 @@ From `rage-scripting-five/src/scrEngine.cpp` (public):
   needed with the startup-script hook.
 * Everything above is static analysis; the first live run on 1.0.3889.0 with
   the new code decides.
+
+## Native registration record (found on the first live run)
+
+The game's own lookup, the function called right after
+`lea rcx, [registration table]` with `rdx = hash` (RVA 0x1676740 on
+1.0.3889.0), reads the obfuscated record like this:
+
+```
+movzx eax, dl              ; bucket = hash & 0xFF
+mov   r8, [rcx+rax*8]      ; first record of the bucket
+lea   r9, [r8+0x48]        ; numEntries1 / numEntries2 (XOR their own address)
+lea   rdx, [r8+0x54]       ; hash entries, 16 bytes each, from +0x54
+mov   r11d, [rdx+8]        ; key = dword(entry+8) ^ (uint32)entry
+...                        ; hash = (dword(entry+4)^key) << 32 | (dword(entry)^key)
+mov   rax, [r8+rcx*8+0x10] ; handlers[i]
+```
+
+`+0x54` is not 8-byte aligned. A struct with `uint32_t numEntries1,
+numEntries2, pad; uint64_t hashes[]` puts the hashes at +0x58 and decodes
+garbage: a full walk still counts every native (6701) and returns the right
+handlers, but no lookup by hash ever matches, and every native silently
+answers zero. FiveM's `NativeRegistration_obf::getHash` reads `this + 0x54`
+explicitly for the same reason. `shared/NativeRegistrationObf.h` now does the
+arithmetic on raw bytes and `tests/native_registration_test.cpp` pins it.

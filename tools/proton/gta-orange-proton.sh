@@ -134,7 +134,7 @@ summarize_client_log() {
 
 	# The launcher says so when the DLL was already in the process: then the
 	# game was never re-entered and client.log below is from an earlier run.
-	if [ -f "$LAUNCHER_LOG" ] && tail -n 40 "$LAUNCHER_LOG" | grep -aq 'is ALREADY loaded'; then
+	if [ -f "$LAUNCHER_LOG" ] && awk '/---- GTA:Orange Launcher .* started ----/ { block = "" } { block = block $0 "\n" } END { printf "%s", block }' "$LAUNCHER_LOG" | grep -aq 'is ALREADY loaded'; then
 		log "This run injected nothing: orange-core.dll was already loaded in the running GTA5.exe."
 		log "         Windows hands back the module that is already there without running it again."
 		log "         Restart GTA V (not just this script) to load the current orange-core.dll."

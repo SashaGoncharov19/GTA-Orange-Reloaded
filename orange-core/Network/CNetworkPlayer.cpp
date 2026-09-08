@@ -446,6 +446,18 @@ void CNetworkPlayer::SetMoveToDirectionAndAiming(CVector3 vecPos, CVector3 vecMo
 
 void CNetworkPlayer::AssignTask(GTA::CTask *task)
 {
+	// CPed / CTaskTree member offsets are the reference build's: assigning a
+	// task through them on another build writes into unknown memory.
+	if (!GameOffsets::IsReferenceBuild())
+	{
+		static bool said = false;
+		if (!said)
+		{
+			said = true;
+			log_error << "Task sync: remote tasks are not applied on this game build (CPed task tree layout unverified)" << std::endl;
+		}
+		return;
+	}
 	if (IsSpawned())
 	{
 		pedHandler->TasksPtr->PrimaryTasks->AssignTask(task, GTA::TASK_PRIORITY_HIGH);

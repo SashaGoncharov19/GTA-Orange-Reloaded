@@ -180,9 +180,26 @@ void nativeInit(UINT64 hash)
 	g_hash = hash;
 }
 
+// Said once per native: a silent miss looks exactly like a native that
+// answered zero, and hid the registration layout bug on 3889. Kept out of
+// nativeCall because a function with __try may not hold objects that need
+// unwinding (C2712).
+static void ReportMissingHandler(uint64_t hash)
+{
+	static std::set<uint64_t> reported;
+	if (!reported.insert(hash).second)
+		return;
+	uint64_t translated = hash;
+	NativeTable::Translate(hash, translated);
+	log_error << "Natives: no handler for 0x" << std::hex << std::uppercase << hash << " (looked up as 0x" << translated
+		<< std::dec << std::nouppercase << ") in the registration table; the call returns zero" << std::endl;
+}
+
 uint64_t * nativeCall()
 {
 	auto fn = ScriptEngine::GetNativeHandler(g_hash);
+	if (fn == 0)
+		ReportMissingHandler(g_hash);
 	if (fn != 0) {
 		__try {
 			fn(&g_context);

@@ -8,9 +8,15 @@ CPedestrian::CPedestrian(Hash Model, CVector3 Position, float Heading) :CEntity(
 		while (!STREAMING::HAS_MODEL_LOADED(Model))
 			scriptWait(0);
 
-		CWorld::Get()->CPedFactoryPtr->Create = PedFactoryHook::Get()->CreateHook;
+		// The ped factory hook swaps a function pointer inside CPedFactory at
+		// the reference build's offset; on any other build that write lands
+		// somewhere else in the factory. Plain CREATE_PED there.
+		bool factoryHook = GameOffsets::IsReferenceBuild();
+		if (factoryHook)
+			CWorld::Get()->CPedFactoryPtr->Create = PedFactoryHook::Get()->CreateHook;
 		Handle = (Entity)PED::CREATE_PED(1, Model, Position.fX, Position.fY, Position.fZ, Heading, true, false);
-		CWorld::Get()->CPedFactoryPtr->Create = &hookCreatePed;
+		if (factoryHook)
+			CWorld::Get()->CPedFactoryPtr->Create = &hookCreatePed;
 		STREAMING::SET_MODEL_AS_NO_LONGER_NEEDED(Model);
 		AI::TASK_SET_BLOCKING_OF_NON_TEMPORARY_EVENTS(Handle, true);
 		/*PED::SET_PED_CAN_RAGDOLL_FROM_PLAYER_IMPACT(Handle, false);

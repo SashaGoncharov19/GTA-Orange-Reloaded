@@ -53,7 +53,7 @@ void CLocalPlayer::GetOnFootSync(OnFootSyncData& onfoot)
 {
 	onfoot.hModel = GetModel();
 	onfoot.bJumping = IsJumping();
-	onfoot.fMoveSpeed = CWorld::Get()->CPedPtr->MoveSpeed;
+	onfoot.fMoveSpeed = GameOffsets::IsReferenceBuild() ? CWorld::Get()->CPedPtr->MoveSpeed : ENTITY::GET_ENTITY_SPEED(Handle);
 	onfoot.vecPos = GetPosition();
 	onfoot.vecRot = GetRotation();
 	onfoot.fHeading = GetHeading();
@@ -64,8 +64,20 @@ void CLocalPlayer::GetOnFootSync(OnFootSyncData& onfoot)
 	onfoot.usArmour = GetArmour();
 	onfoot.ulWeapon = GetCurrentWeapon();
 	onfoot.uAmmo = GetCurrentWeaponAmmo();
-	onfoot.vecAim = CWorld::Get()->CPedPtr->CPlayerInfoPtr->AimPosition;
-	onfoot.bAiming = (CWorld::Get()->CPedPtr->CPlayerInfoPtr->AimState == 2);
+	if (GameOffsets::IsReferenceBuild())
+	{
+		onfoot.vecAim = CWorld::Get()->CPedPtr->CPlayerInfoPtr->AimPosition;
+		onfoot.bAiming = (CWorld::Get()->CPedPtr->CPlayerInfoPtr->AimState == 2);
+	}
+	else
+	{
+		// CPlayerInfo's layout is the reference build's; read the same facts
+		// through natives instead of dereferencing a 2017 member.
+		onfoot.bAiming = PLAYER::IS_PLAYER_FREE_AIMING(PLAYER::PLAYER_ID()) != 0;
+		Vector3 impact = { 0 };
+		onfoot.vecAim = (onfoot.bAiming && WEAPON::GET_PED_LAST_WEAPON_IMPACT_COORD(Handle, &impact))
+			? CVector3(impact.x, impact.y, impact.z) : CVector3(0.f, 0.f, 0.f);
+	}
 	onfoot.bShooting = PED::IS_PED_SHOOTING(Handle) ? true : false;
 	onfoot.bRagdoll = PED::IS_PED_RAGDOLL(Handle) ? true : false;
 
