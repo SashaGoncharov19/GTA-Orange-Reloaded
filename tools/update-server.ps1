@@ -6,20 +6,29 @@
     the examples and this script; config.yml and your resources\ are left untouched.
     Restart the server afterwards.
 .EXAMPLE
-    .\update-server.ps1                 # latest release
+    .\update-server.ps1                 # same channel as the installed build
     .\update-server.ps1 -Channel nightly
+    .\update-server.ps1 -Channel stable # move a nightly installation to the releases
     .\update-server.ps1 -Force
 #>
 param(
     [string]$Dir = $PSScriptRoot,
-    [ValidateSet("stable", "nightly")]
-    [string]$Channel = "stable",
+    [ValidateSet("", "stable", "nightly")]
+    [string]$Channel = "",
     [string]$Repository = "SashaGoncharov19/GTA-Orange-Reloaded",
     [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+$local = if (Test-Path "$Dir\version.txt") { (Get-Content "$Dir\version.txt" -Raw).Trim() } else { "unknown" }
+if (-not $Channel) {
+    # Default to the channel of the installed build, never downgrade a nightly
+    # server to the (older) stable release by accident.
+    $Channel = if ($local -like "nightly-*") { "nightly" } else { "stable" }
+    Write-Host "[update] channel not given, using the channel of the installed build: $Channel"
+}
 
 if ($Channel -eq "nightly") {
     $base = "https://github.com/$Repository/releases/download/nightly"
@@ -29,7 +38,6 @@ if ($Channel -eq "nightly") {
 
 Write-Host "[update] channel: $Channel ($base)"
 $remote = (Invoke-WebRequest -UseBasicParsing "$base/server-version.txt").Content.Trim()
-$local = if (Test-Path "$Dir\version.txt") { (Get-Content "$Dir\version.txt" -Raw).Trim() } else { "unknown" }
 Write-Host "[update] installed: $local, available: $remote"
 
 if ($remote -eq $local -and -not $Force) {

@@ -8,6 +8,32 @@ static std::string LastErrorText()
 	return "error " + std::to_string(GetLastError());
 }
 
+// Anti-cheat clients (BattlEye: BEClient_x64.dll) block DLL injection by
+// design. GTA:Orange only works in story mode with the anti-cheat turned off,
+// which the Rockstar Games Launcher offers as a setting; this just reports it.
+static bool GameHasAntiCheatModule(int pid, std::string& moduleName)
+{
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
+	if (snapshot == INVALID_HANDLE_VALUE)
+		return false;
+	bool found = false;
+	MODULEENTRY32 entry;
+	entry.dwSize = sizeof(entry);
+	if (Module32First(snapshot, &entry))
+	{
+		do {
+			if (_wcsnicmp(entry.szModule, L"BEClient", 8) == 0)
+			{
+				moduleName = Utils::UnicodeToMultibyte(entry.szModule);
+				found = true;
+				break;
+			}
+		} while (Module32Next(snapshot, &entry));
+	}
+	CloseHandle(snapshot);
+	return found;
+}
+
 Injector::Injector()
 {
 }
@@ -44,6 +70,10 @@ bool Injector::InjectAll(bool waitForUnpack, int unpackTimeoutSeconds)
 		return false;
 	}
 	LauncherLog("inject: GTA5.exe pid " + std::to_string(pid));
+	std::string antiCheat;
+	if (GameHasAntiCheatModule(pid, antiCheat))
+		LauncherLog("inject: WARNING: anti-cheat module " + antiCheat + " is loaded in GTA5.exe, injecting will be refused while it runs; "
+			"GTA:Orange needs story mode with BattlEye turned off (a setting of the Rockstar Games Launcher)");
 	if (waitForUnpack)
 	{
 		LauncherLog("inject: waiting for the executable to be unpacked (up to " + std::to_string(unpackTimeoutSeconds) + "s)");
@@ -130,7 +160,10 @@ bool Injector::Inject(int processId, std::string dllName, std::string& error)
 	HANDLE process = OpenProcess(PROCESS_ALL_ACCESS, false, processId);
 	if (!process)
 	{
-		error = "OpenProcess failed (error " + std::to_string(GetLastError()) + ")";
+		DWORD code = GetLastError();
+		error = "OpenProcess failed (error " + std::to_string(code) + ")";
+		if (code == ERROR_ACCESS_DENIED)
+			error += ": access denied - the game runs in another Proton prefix / as another user, or an anti-cheat protects it";
 		return false;
 	}
 	LPVOID LoadLibraryA_ = (LPVOID)GetProcAddress(GetModuleHandle(L"kernel32.dll"), "LoadLibraryA");

@@ -5,6 +5,7 @@
 #include "Launcher.h"
 #include "Injector.h"
 #include "Updater.h"
+#include "UpdateManifest.h"
 #include "LauncherLog.h"
 #include <thread>
 #include <mutex>
@@ -298,7 +299,12 @@ void LaunchGame()
 			UpdaterSettings settings;
 			LoadLauncherSettings(orangeDir, settings);
 			if (!g_options.channel.empty())
+			{
 				settings.channel = g_options.channel;
+				settings.channelExplicit = true;
+			}
+			if (settings.channel.empty())
+				settings.channel = FromUtf8(DefaultChannelFor(ORANGE_VERSION));
 			if (g_options.forceUpdate)
 			{
 				settings.enabled = true;
@@ -309,7 +315,8 @@ void LaunchGame()
 				SetSplashStatus(status);
 				UpdateSplash(progress);
 			});
-			LauncherLog(L"update check: channel " + settings.channel + L", repository " + settings.repository
+			LauncherLog(L"update check: channel " + settings.channel
+				+ (settings.channelExplicit ? L" (--channel)" : L"") + L", repository " + settings.repository
 				+ (settings.enabled ? L"" : L" (disabled in launcher.xml)"));
 			UpdateResult result = updater.Run();
 			if (result == UpdateResult::RestartRequired)

@@ -6,7 +6,9 @@
 # Usage: ./update-server.sh [--dir DIR] [--channel stable|nightly] [--force] [--repository owner/repo]
 #
 #   --dir DIR        server folder (default: the folder of this script)
-#   --channel NAME   stable = latest release (default), nightly = latest master build
+#   --channel NAME   stable = latest release, nightly = latest master build
+#                    (default: the channel the installed build came from, so a
+#                    nightly server is never downgraded to the stable release)
 #   --force          reinstall even if the version already matches
 #
 # Binaries, the Lua API bootstrap, the examples and this script are replaced;
@@ -17,7 +19,7 @@ set -euo pipefail
 
 REPO="${ORANGE_REPOSITORY:-SashaGoncharov19/GTA-Orange-Reloaded}"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CHANNEL="stable"
+CHANNEL=""
 FORCE=0
 
 while [ $# -gt 0 ]; do
@@ -31,6 +33,15 @@ while [ $# -gt 0 ]; do
 	esac
 done
 
+LOCAL="$(cat "$DIR/version.txt" 2>/dev/null | tr -d '[:space:]' || true)"
+if [ -z "$CHANNEL" ]; then
+	case "$LOCAL" in
+		nightly-*) CHANNEL="nightly" ;;
+		*) CHANNEL="stable" ;;
+	esac
+	echo "[update] channel not given, using the channel of the installed build: $CHANNEL"
+fi
+
 if [ "$CHANNEL" = "nightly" ]; then
 	BASE="https://github.com/$REPO/releases/download/nightly"
 else
@@ -41,7 +52,6 @@ command -v curl >/dev/null 2>&1 || { echo "curl is required" >&2; exit 1; }
 
 echo "[update] channel: $CHANNEL ($BASE)"
 REMOTE="$(curl -fsSL "$BASE/server-version.txt" | tr -d '[:space:]')"
-LOCAL="$(cat "$DIR/version.txt" 2>/dev/null | tr -d '[:space:]' || true)"
 echo "[update] installed: ${LOCAL:-unknown}, available: $REMOTE"
 
 if [ "$REMOTE" = "$LOCAL" ] && [ "$FORCE" = 0 ]; then

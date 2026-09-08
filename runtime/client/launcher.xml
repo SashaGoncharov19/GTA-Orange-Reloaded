@@ -6,9 +6,14 @@
           enabled     true / false
           channel     stable  = the latest GitHub release
                       nightly = the latest build of the master branch
+                      not set = the channel this build came from (nightly
+                      builds follow nightly, releases follow stable)
           repository  GitHub repository that publishes the releases
-        Command line overrides: --no-update, --update, --channel nightly
+        A build never switches channels on its own. To move an installation
+        to the other channel run once:  Launcher.exe --channel nightly --update
+        (or --channel stable --update).
+        Other command line overrides: --no-update, --update.
         Details are written to launcher.log next to Launcher.exe.
     -->
-    <updates enabled="true" channel="stable" repository="SashaGoncharov19/GTA-Orange-Reloaded" />
+    <updates enabled="true" repository="SashaGoncharov19/GTA-Orange-Reloaded" />
 </launcher>

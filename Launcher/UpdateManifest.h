@@ -82,3 +82,16 @@ inline bool IsDevVersion(const std::string& version)
 {
 	return version.empty() || version == "dev" || version.find("-dev") != std::string::npos;
 }
+
+// CI versions master builds as "nightly-YYYYMMDD-<sha>".
+inline bool IsNightlyVersion(const std::string& version)
+{
+	return version.compare(0, 8, "nightly-") == 0;
+}
+
+// The update channel a build belongs to: nightly builds follow the rolling
+// "nightly" pre-release, everything else the latest stable release.
+inline const char* DefaultChannelFor(const std::string& version)
+{
+	return IsNightlyVersion(version) ? "nightly" : "stable";
+}

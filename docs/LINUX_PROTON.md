@@ -84,11 +84,20 @@ protontricks-launch --appid 271590 ./Launcher.exe --inject   # alternative
 ### Automatic updates under Proton
 
 `Launcher.exe` checks the GitHub releases for a newer client before every
-start (see `launcher.xml`; `--no-update` disables it, `--channel nightly`
-follows the master builds). The download uses WinHTTP inside the Proton
-prefix; if it fails (no network in the prefix, missing TLS support) the
-launcher logs the reason to `launcher.log` and starts the game anyway. In that
-case update the client folder by hand from the releases page.
+start (see `launcher.xml`; `--no-update` disables it). A nightly client
+follows the `nightly` pre-release and a release the stable releases; the
+launcher never switches channels on its own, so a nightly client is not
+"updated" to the older stable release. To switch, run once:
+
+```bash
+./gta-orange-proton.sh --no-launch --channel stable --update    # or --channel nightly
+```
+
+(unknown options of the script are passed on to `Launcher.exe`). The download
+uses WinHTTP inside the Proton prefix; if it fails (no network in the prefix,
+missing TLS support) the launcher logs the reason to `launcher.log` and starts
+the game anyway. In that case update the client folder by hand from the
+releases page.
 
 The Linux server has its own updater: `./update-server.sh` in the server
 folder (`--channel nightly` for nightly builds).
