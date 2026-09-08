@@ -181,6 +181,7 @@ using namespace RakNet;
 #include "MemoryCache.h"
 #include "Memory.h"
 #include "Globals.h"
+#include "GameOffsets.h"
 #include "GtaScripts.h"
 #include "orange-core.h"
 #include "Utils.h"

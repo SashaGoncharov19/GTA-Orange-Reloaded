@@ -3,14 +3,18 @@
 eThreadState ScriptThread::Tick(uint32_t opsToExecute)
 {
 	typedef eThreadState(__thiscall * ScriptThreadTick_t)(ScriptThread * ScriptThread, uint32_t opsToExecute);
-	ScriptThreadTick_t threadTickGta = (ScriptThreadTick_t)CMemory((uintptr_t)GetModuleHandle(NULL) + 0x9F646B).get<void>(-0xF);
+	static ScriptThreadTick_t threadTickGta = GameFunc<ScriptThreadTick_t>("ScriptThreadTick");
+	if (!threadTickGta)
+		return m_Context.m_State;
 	return threadTickGta(this, opsToExecute);
 }
 
 void ScriptThread::Kill()
 {
 	typedef void(__thiscall * ScriptThreadKill_t)(ScriptThread * ScriptThread);
-	ScriptThreadKill_t killScriptThread = (ScriptThreadKill_t)CMemory((uintptr_t)GetModuleHandle(NULL) + 0x9ECF72).get<void>(-0x6);
+	static ScriptThreadKill_t killScriptThread = GameFunc<ScriptThreadKill_t>("ScriptThreadKill");
+	if (!killScriptThread)
+		return;
 	return killScriptThread(this);
 }
 
@@ -32,8 +36,12 @@ eThreadState ScriptThread::Run(uint32_t opsToExecute)
 void ScriptThreadInit(ScriptThread * thread)
 {
 	typedef void(__thiscall * ScriptThreadInit_t)(ScriptThread * ScriptThread);
-	auto scriptThreadInitPattern = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x9EB4DC);//problem
-	ScriptThreadInit_t ScriptThreadInit_ = (ScriptThreadInit_t)scriptThreadInitPattern();
+	static ScriptThreadInit_t ScriptThreadInit_ = GameFunc<ScriptThreadInit_t>("ScriptThreadInit");
+	if (!ScriptThreadInit_)
+	{
+		log_error << "ScriptThreadInit unresolved, script thread not initialised" << std::endl;
+		return;
+	}
 	return ScriptThreadInit_(thread);
 }
 

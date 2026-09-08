@@ -266,8 +266,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 static void Fail(const wchar_t* message)
 {
+	LauncherLog(std::wstring(L"FATAL: ") + message);
 	MessageBoxW(NULL, message, L"GTA:Orange Launcher", MB_OK | MB_ICONERROR);
 	TerminateProcess(GetCurrentProcess(), 1);
+}
+
+static std::string BoolText(bool value)
+{
+	return value ? "yes" : "no";
 }
 
 void LaunchGame()
@@ -277,6 +283,13 @@ void LaunchGame()
 		std::wstring orangeDir = GetLauncherDir();
 		SetCurrentDirectoryW(orangeDir.c_str());
 		LauncherLogInit(orangeDir);
+		LauncherLog("---- Launcher " ORANGE_VERSION " starting ----");
+		LauncherLog(L"launcher folder: " + orangeDir);
+		LauncherLog(L"command line: " + std::wstring(GetCommandLineW()));
+		LauncherLog("mode: " + std::string(g_options.injectOnly ? "inject into a running GTA5.exe (--inject)" : "start the game and inject")
+			+ ", wait for unpack: " + BoolText(g_options.waitForUnpack)
+			+ ", timeout: " + std::to_string(g_options.timeoutSeconds) + "s"
+			+ ", update check: " + BoolText(g_options.checkUpdates && !g_options.afterUpdate));
 		Updater::CleanupAfterRestart(orangeDir);
 
 		// Auto-update (never blocks the game start: failures are logged only).
@@ -296,20 +309,28 @@ void LaunchGame()
 				SetSplashStatus(status);
 				UpdateSplash(progress);
 			});
+			LauncherLog(L"update check: channel " + settings.channel + L", repository " + settings.repository
+				+ (settings.enabled ? L"" : L" (disabled in launcher.xml)"));
 			UpdateResult result = updater.Run();
 			if (result == UpdateResult::RestartRequired)
 			{
+				LauncherLog("updater: launcher updated, restart required");
 				SetSplashStatus(L"Restarting...");
 				RestartLauncher();
 				return;
 			}
 			if (result == UpdateResult::Failed)
 			{
-				LauncherLog("updater: " + updater.LastError());
+				LauncherLog("updater: FAILED: " + updater.LastError() + " (starting the game anyway)");
 				SetSplashStatus(L"Update check failed, starting anyway");
 				Sleep(1500);
 			}
+			else
+				LauncherLog(std::string("updater: ") + (result == UpdateResult::Updated ? "client files updated" :
+					result == UpdateResult::UpToDate ? "client is up to date" : "skipped"));
 		}
+		else
+			LauncherLog(g_options.afterUpdate ? "update check: skipped (just restarted after a self-update)" : "update check: skipped (--no-update)");
 		SetSplashStatus(g_options.injectOnly ? L"Waiting for GTA5.exe..." : L"Starting GTA V...");
 
 		Registry::CreateRegKeyStructure(HKEY_CURRENT_USER, L"SOFTWARE\\GTA Orange Team\\GTA Orange");
@@ -317,6 +338,7 @@ void LaunchGame()
 
 		std::string curPath = Utils::UnicodeToMultibyte(orangeDir);
 		Injector::Get().PushLibrary(curPath + "\\orange-core.dll");
+		LauncherLog("library to inject: " + curPath + "\\orange-core.dll");
 
 		// Make our folder visible to a game started by us (orange-core.dll's dependencies).
 		{
@@ -334,24 +356,32 @@ void LaunchGame()
 		if (!g_options.injectOnly)
 		{
 			std::wstring gameFolder = g_options.gameDir;
+			if (!gameFolder.empty())
+				LauncherLog(L"game folder from --game-dir: " + gameFolder);
 			if (gameFolder.empty())
 			{
 				TCHAR TgameFolder[MAX_PATH] = { 0 };
 				DWORD gameLen = MAX_PATH;
 				if (!Registry::Get_StringRegistryValue(HKEY_CURRENT_USER, L"SOFTWARE\\GTA Orange Team\\GTA Orange", L"GameFolder", TgameFolder, gameLen))
 				{
+					LauncherLog("game folder not in the registry, asking the user");
 					CFolderBrowser folderBrowser(L"Select your GTA:V folder");
 					bool folderSelected = folderBrowser.Show();
 					if (!folderSelected)
 					{
+						LauncherLog("folder dialog cancelled, exiting");
 						TerminateProcess(GetCurrentProcess(), 0);
 						return;
 					}
 					gameFolder = folderBrowser.GetPath();
 					Registry::Set_StringRegistryValue(HKEY_CURRENT_USER, L"SOFTWARE\\GTA Orange Team\\GTA Orange", L"GameFolder", gameFolder.c_str());
+					LauncherLog(L"game folder selected: " + gameFolder);
 				}
 				else
+				{
 					gameFolder = TgameFolder;
+					LauncherLog(L"game folder from the registry: " + gameFolder);
+				}
 			}
 
 			std::wstring gamePath = gameFolder + L"\\GTA5.exe";
@@ -367,22 +397,37 @@ void LaunchGame()
 				isSteam = true;
 			if (g_options.forceDirect)
 				isSteam = false;
+			LauncherLog("GTA5.exe size: " + std::to_string(fs) + " bytes, steam: " + BoolText(isSteam)
+				+ ", known non-retail executable: " + BoolText(isPirate));
 
 			if (!isSteam || isPirate)
+			{
+				LauncherLog(L"starting GTA5.exe directly: " + gamePath);
 				Injector::Get().Run(gameFolder, gamePath);
+			}
 			else
+			{
+				LauncherLog("starting the game through Steam (steam://run/271590)");
 				Injector::Get().RunSteam();
+			}
 		}
 
 		UpdateSplash(0.70f);
+		LauncherLog("waiting for GTA5.exe (up to " + std::to_string(g_options.timeoutSeconds) + "s)");
 		if (!Injector::Get().WaitUntilGameStarts(g_options.timeoutSeconds))
 			Fail(L"Timed out waiting for GTA5.exe to start");
+		SetSplashStatus(L"Injecting orange-core.dll...");
 		if (!Injector::Get().InjectAll(g_options.waitForUnpack && !isPirate))
+		{
+			LauncherLog("injection FAILED, see above; the game keeps running without GTA:Orange");
 			TerminateProcess(GetCurrentProcess(), 1);
+		}
+		LauncherLog("done: orange-core.dll injected, see client.log for what happens inside the game");
 		UpdateSplash(1.0f);
 	}
 	catch (const std::exception& e)
 	{
+		LauncherLog(std::string("FATAL: ") + e.what());
 		MessageBoxA(NULL, e.what(), "GTA:Orange Launcher", MB_OK | MB_ICONERROR);
 		TerminateProcess(GetCurrentProcess(), 1);
 	}

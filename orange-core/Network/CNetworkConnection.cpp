@@ -166,11 +166,25 @@ void CNetworkConnection::Tick()
 						bsIn.ReadBits(taskInfo, size);
 						rageBuffer data;
 						typedef void(*InitBuffer)(rageBuffer*);
-						((InitBuffer)CMemory((uintptr_t)GetModuleHandle(NULL) + 0x11E7920)())(&data);
 						typedef void(*InitReadBuffer)(rageBuffer*, unsigned char*, int, int);
-						((InitReadBuffer)CMemory((uintptr_t)GetModuleHandle(NULL) + 0x11EBCA8)())(&data, taskInfo, size, 0);
 						typedef CSerialisedFSMTaskInfo*(*CreateTaskInfoByID)(unsigned int);
-						CSerialisedFSMTaskInfo* serTask = ((CreateTaskInfoByID)CMemory((uintptr_t)GetModuleHandle(NULL) + 0x0658904)())(taskID);
+						static InitBuffer initBuffer = GameFunc<InitBuffer>("RageBufferInit");
+						static InitReadBuffer initReadBuffer = GameFunc<InitReadBuffer>("RageBufferInitRead");
+						static CreateTaskInfoByID createTaskInfo = GameFunc<CreateTaskInfoByID>("CreateTaskInfoById");
+						if (!initBuffer || !initReadBuffer || !createTaskInfo)
+						{
+							// Task synchronisation offsets are unresolved on this game build.
+							delete[] taskInfo;
+							continue;
+						}
+						initBuffer(&data);
+						initReadBuffer(&data, taskInfo, size, 0);
+						CSerialisedFSMTaskInfo* serTask = createTaskInfo(taskID);
+						if (!serTask)
+						{
+							delete[] taskInfo;
+							continue;
+						}
 
 						serTask->Read(&data);
 						ClonedTasks.push_back({ serTask, taskID });

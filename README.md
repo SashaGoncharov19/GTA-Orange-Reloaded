@@ -98,11 +98,13 @@ Nothing has to be downloaded by hand after the first install:
   untouched. Add `--channel nightly` / `-Channel nightly` for nightly builds.
   Docker users just pull the new image tag.
 
-> **Important:** `orange-core.dll` hooks `GTA5.exe` through hard-coded offsets
-> from the **January 2017** game build. On any other build it now detects the
-> mismatch, logs it to `client.log` and stays inactive instead of crashing the
-> game. Porting the hooks to a current GTA V build (pattern scanning) is the
-> main open task - see [Known limitations](#known-limitations).
+> **Important:** `orange-core.dll` hooks `GTA5.exe` at ~90 addresses whose
+> built-in values belong to the **January 2017** game build. On any other build
+> it detects the mismatch, stays inactive instead of crashing the game, and
+> writes `offsets-<version>.generated.ini` next to itself listing every address
+> it needs. The values for a newer build go into `offsets.ini` - see
+> [docs/UPDATING_OFFSETS.md](docs/UPDATING_OFFSETS.md) and
+> [Known limitations](#known-limitations).
 
 ## Building from source
 
@@ -159,12 +161,13 @@ To publish a release: `git tag v0.3.0 && git push origin v0.3.0`.
 
 ## Known limitations
 
-* **Game build:** the client targets the GTA V build of January 2017. The
-  offsets in `orange-core/orange-core.cpp`, `orange-core/Core/scrEngine.cpp`
-  and `orange-core/ScaleformManager.h` (the original signatures are kept in
-  comments) have to be replaced by pattern scans before the client can work
-  with a current game version. Until then the DLL refuses to patch an unknown
-  build.
+* **Game build:** the built-in offsets target the GTA V build of January
+  2017. All of them live in one table (`orange-core/GameOffsets.cpp`) and can
+  be overridden per game version through `offsets.ini` (RVA, `disabled`, or a
+  byte pattern); the script-engine entries already carry patterns. Until the
+  entries for a current build are filled in, the DLL refuses to patch it. The
+  workflow is described in [docs/UPDATING_OFFSETS.md](docs/UPDATING_OFFSETS.md).
+  Native hashes and structure layouts are a separate, still open task.
 * **Scaleform:** the DrawText experiment needs Autodesk's GFx 4.0 SDK
   libraries, which are not redistributable; it is disabled by default.
 * **MySQL on Windows:** the Windows lua-module is built without LuaSQL/MySQL

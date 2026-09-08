@@ -25,6 +25,7 @@ set(ORANGE_CORE_SOURCES
   D3D11/Memory/minhook/src/trampoline.cpp
   D3D11/rendering.cpp
   dllmain.cpp
+  GameOffsets.cpp
   Globals.cpp
   GtaScripts.cpp
   GTA/CGraphics.cpp

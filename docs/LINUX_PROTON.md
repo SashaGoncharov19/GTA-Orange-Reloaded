@@ -95,11 +95,31 @@ folder (`--channel nightly` for nightly builds).
 
 ### Where things are logged
 
-* `launcher.log` next to `Launcher.exe` – launcher and auto-updater activity.
-* `client.log` next to `orange-core.dll` – everything the client core does,
-  including the **game build check** (see below).
-* Proton/Wine output – run the script from a terminal; add `WINEDEBUG=+loaddll`
-  to the environment to see DLL loading problems.
+The script prints the paths before injecting and shows the tail of both logs
+when the launcher exits (`./gta-orange-proton.sh --logs` re-prints them any
+time):
+
+* `launcher.log` next to `Launcher.exe` – every launcher step: options,
+  update check, the game folder, waiting for `GTA5.exe` (pid), the unpack
+  wait, the injection result (`LoadLibrary returned 0x...` = the DLL is loaded
+  in the game).
+* `client.log` next to `orange-core.dll` – everything the client core does
+  inside the game: its version, the `GTA5.exe` path and version, the
+  **offset resolution** (one line per entry, see below), hooks, network.
+* Proton/Wine output – `PROTON_LOG=1 ./gta-orange-proton.sh` writes Wine's
+  log for the launcher to `~/steam-271590.log`; for the game itself set
+  `PROTON_LOG=1 %command%` as the launch option of GTA V in Steam. Add
+  `WINEDEBUG=+loaddll` to see DLL loading problems.
+
+How to read a run:
+
+| You see | Meaning |
+|---|---|
+| `launcher.log`: `inject: FAILED: OpenProcess failed` | the launcher does not run in the same Proton prefix as the game (use the script, not a different Proton/prefix) |
+| `launcher.log`: `LoadLibrary failed inside the game process` | `orange-core.dll` could not be loaded - a missing dependency, or the DLL is not the x64 build; `WINEDEBUG=+loaddll` tells which |
+| `launcher.log`: `done: orange-core.dll injected`, no `client.log` | the DLL loaded but could not write its log (folder not writable?) |
+| `client.log`: `Game patches applied` | orange-core is active, F7 opens the chat in game |
+| `client.log`: `Game build check failed, GTA:Orange stays inactive` | unsupported game build - see the next section |
 
 ### Server address
 
@@ -110,24 +130,28 @@ The in-game "Server browser" window currently connects to the address in
 
 ## 3. Known limitation: supported GTA V build
 
-`orange-core.dll` hooks the game through **hard-coded offsets** into
-`GTA5.exe` that were taken from the game build current in **January 2017**
-(the last commit of the original project). GTA V has been updated many times
-since, and every update moves those offsets.
+`orange-core.dll` hooks the game at about 90 addresses inside `GTA5.exe`. The
+built-in values were taken from the game build current in **January 2017**
+(the last commit of the original project); every game update moves them.
 
-To avoid crashing the game, the DLL now verifies a set of byte signatures at
-the expected offsets before patching anything (`VerifyGameBuild()` in
-`orange-core/orange-core.cpp`). On a different build it logs
+To avoid crashing the game, the DLL first identifies the build (five byte
+signatures at their reference addresses) and resolves every address it needs
+(`GameOffsets::Initialize()` in `orange-core/GameOffsets.cpp`). On a different
+build `client.log` shows
 
 ```
-[Error] Signature mismatch: ForceToSingle at GTA5.exe+0x2773c
+[Info] Game version: 1.0.3411.0, image base 0x7FF6C0A20000, image size 0x4A5B000
+[Info] Game build check: NOT the reference build, offsets must come from offsets.ini or pattern scans
+[Error] offset CodeCave: UNRESOLVED (required) - no pattern known for this entry
 ...
+[Info] Offsets: 90 total, 0 reference, 0 from offsets.ini, 14 by pattern, 0 disabled, 76 unresolved (18 required)
+[Info] Offsets template written to Z:\home\you\gta-orange\client\offsets-1.0.3411.0.generated.ini
 [Error] Game build check failed, GTA:Orange stays inactive
 ```
 
-shows a message box and stays inactive. Porting the client to a current game
-build means replacing those offsets by pattern scans (the comments in
-`orange-core.cpp`, `Core/scrEngine.cpp` and `ScaleformManager.h` contain the
-original signatures) – this is the main open task for anyone who wants to play
-with the mod on a modern GTA V. The build/CI/Proton plumbing in this
-repository is ready for that work.
+shows a message box and stays inactive. The generated
+`offsets-<version>.generated.ini` lists every entry with a description; the
+addresses for your build go into `offsets.ini` next to the DLL. The full
+workflow (syntax, how to find each kind of address, what else changes between
+builds) is in [UPDATING_OFFSETS.md](UPDATING_OFFSETS.md). The build/CI/Proton
+plumbing in this repository is ready for that work.

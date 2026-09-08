@@ -8,3 +8,11 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/Launcher/UpdateManifest.h")
     FOLDER "tests")
   add_test(NAME manifest_test COMMAND manifest_test)
 endif()
+
+# offsets.ini reader / pattern scanner used by orange-core (shared/OffsetSpec.h)
+add_executable(offsets_test offsets_test.cpp)
+target_include_directories(offsets_test PRIVATE "${ORANGE_SHARED_DIR}")
+set_target_properties(offsets_test PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/tests"
+  FOLDER "tests")
+add_test(NAME offsets_test COMMAND offsets_test)

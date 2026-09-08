@@ -201,6 +201,8 @@ VTasks::~VTasks()
 
 void *VTasks::GetTaskFromID(unsigned int taskID) {
 	typedef void*(*__func)(unsigned int);
-	((__func)(CMemory((uintptr_t)GetModuleHandle(NULL) + 0x658904)()))(taskID);
+	static __func createTaskInfo = GameFunc<__func>("CreateTaskInfoById");
+	if (createTaskInfo)
+		createTaskInfo(taskID);
 	return nullptr;
 }

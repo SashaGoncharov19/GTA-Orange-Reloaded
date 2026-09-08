@@ -9,8 +9,18 @@ CMemory::~CMemory()
 {
 }
 
+bool CMemory::writable(size_t length) const
+{
+	if (address)
+		return true;
+	log_error << "CMemory: write of " << length << " byte(s) skipped, the game offset is unresolved on this build" << std::endl;
+	return false;
+}
+
 void CMemory::put(const char * value)
 {
+	if (!writable(strlen(value)))
+		return;
 	unsigned long dwProtectOld;
 	VirtualProtect((LPVOID)address, 2, PAGE_EXECUTE_READWRITE, &dwProtectOld);
 	memcpy(address, value, strlen(value));
@@ -35,6 +45,8 @@ bool CMemory::memoryCompare(const BYTE *data, const BYTE *pattern, const char *m
 
 void CMemory::nop(size_t length)
 {
+	if (!writable(length))
+		return;
 	unsigned long dwProtectOld;
 
 	VirtualProtect((LPVOID)address, length, PAGE_EXECUTE_READWRITE, &dwProtectOld);
@@ -45,6 +57,8 @@ void CMemory::nop(size_t length)
 
 void CMemory::nearCall(DWORD offset)
 {
+	if (!writable(5))
+		return;
 	DWORD dwOldProtect, dwBkup;
 	VirtualProtect((LPVOID*)address, 5, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 	*((BYTE*)address) = 0xE8;
@@ -55,6 +69,8 @@ void CMemory::nearCall(DWORD offset)
 
 void CMemory::farJmp(LPVOID func)
 {
+	if (!writable(12))
+		return;
 	DWORD dwOldProtect, dwBkup;
 	VirtualProtect((LPVOID*)address, 12, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 	*((WORD*)address) = 0xB848;
@@ -66,6 +82,8 @@ void CMemory::farJmp(LPVOID func)
 
 void CMemory::farCall(LPVOID func)
 {
+	if (!writable(12))
+		return;
 	DWORD dwOldProtect, dwBkup;
 	VirtualProtect((LPVOID*)address, 12, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 	*((WORD*)address) = 0xB848;

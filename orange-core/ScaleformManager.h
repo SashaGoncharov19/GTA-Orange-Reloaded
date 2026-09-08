@@ -24,13 +24,17 @@ namespace rage {
 
 		static ScaleformManager* Get()
 		{
-			return *(ScaleformManager**)((uintptr_t)GetModuleHandle(NULL) + 0x1F3A868);
+			uintptr_t manager = GameOffsets::Address("ScaleformManager");
+			return manager ? *(ScaleformManager**)manager : nullptr;
 		}
 
 		static Scaleform::GFx::DrawText* CreateText(const char* putf8Str, const Scaleform::GFx::RectF& viewRect, const Scaleform::GFx::DrawTextManager::TextParams* ptxtParams)
 		{
 			typedef Scaleform::GFx::DrawText*(*CreateText_)(Scaleform::GFx::DrawTextManager*, const char*, const Scaleform::GFx::RectF&, const Scaleform::GFx::DrawTextManager::TextParams*);
-			return CreateText_((uintptr_t)GetModuleHandle(NULL) + 0x15ECB18)(Get()->drawTextManager, putf8Str, viewRect, ptxtParams);
+			CreateText_ createText = GameFunc<CreateText_>("ScaleformCreateText");
+			if (!createText || !Get())
+				return nullptr;
+			return createText(Get()->drawTextManager, putf8Str, viewRect, ptxtParams);
 		}
 	}; //Size=0x0068
 }

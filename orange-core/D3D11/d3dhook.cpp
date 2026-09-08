@@ -282,7 +282,13 @@ HRESULT __stdcall D3D11_Present_Hook(IDXGISwapChain* pSwapChain, UINT SyncInterv
 
 bool D3DHook::HookD3D11()
 {
-	IDXGISwapChain1* swapchain = *(IDXGISwapChain1**)CMemory((uintptr_t)GetModuleHandle(NULL) + 0x124BDC5).getOffset();
+	LPVOID swapChainGlobal = GameMem("SwapChain").getOffset();
+	IDXGISwapChain1* swapchain = swapChainGlobal ? *(IDXGISwapChain1**)swapChainGlobal : nullptr;
+	if (!swapchain)
+	{
+		log_error << "D3DHook: swap chain pointer unresolved or NULL, UI rendering disabled" << std::endl;
+		return false;
+	}
 	CGlobals::Get().d3dSwapChain = swapchain;
 	ID3D11Device* device;
 	swapchain->GetDevice(__uuidof(ID3D11Device), (void**)&device);
