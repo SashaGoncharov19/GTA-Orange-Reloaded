@@ -595,7 +595,7 @@ void CNetworkPlayer::MakeTag()
 		if (!CGraphics::Get()->WorldToScreen(CVector3(vecCurPos->fX, vecCurPos->fY, vecCurPos->fZ + 1.1f * tag.k + (tag.distance * 0.04f)), screenPos))
 		{
 			tag.bVisible = false;
-			continue;
+			return;
 		}
 		float screenW = 0.f, screenH = 0.f;
 		CGraphics::Get()->ScreenSize(screenW, screenH);

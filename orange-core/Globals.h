@@ -30,6 +30,7 @@ public:
 	WNDPROC gtaWndProc = nullptr;
 	bool isSteam = false;
 	bool isDeveloper = false;
+	bool storyMode = false;      // orange.storymode: let the stock single player scripts run
 	bool d3dloaded = false;
 	Cam currentcam;
 	ID3D11Device *d3dDevice = nullptr;
