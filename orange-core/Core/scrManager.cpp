@@ -183,6 +183,19 @@ void nativeInit(UINT64 hash)
 uint64_t * nativeCall()
 {
 	auto fn = ScriptEngine::GetNativeHandler(g_hash);
+	if (fn == 0)
+	{
+		// Said once per native: a silent miss looks exactly like a native
+		// that answered zero, and hid the registration layout bug on 3889.
+		static std::set<uint64_t> reported;
+		if (reported.insert(g_hash).second)
+		{
+			uint64_t translated = g_hash;
+			NativeTable::Translate(g_hash, translated);
+			log_error << "Natives: no handler for 0x" << std::hex << std::uppercase << g_hash << " (looked up as 0x" << translated
+				<< std::dec << std::nouppercase << ") in the registration table; the call returns zero" << std::endl;
+		}
+	}
 	if (fn != 0) {
 		__try {
 			fn(&g_context);

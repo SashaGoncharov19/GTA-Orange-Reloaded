@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "NativeCrossmap.h"
 #include "NativeCrossmap_Reference.h"
+#include "NativeRegistrationObf.h"
 
 namespace
 {
@@ -13,43 +14,11 @@ namespace
 		uint64_t hashes[7];
 	};
 
-	// Registration layout from 1.0.1290 on: the next pointer, the entry count
-	// and every hash are XOR-ed with (the low 32 bits of) the address they
-	// are stored at. Decoding follows FiveM's NativeRegistration_obf
-	// (rage-scripting-five/src/scrEngine.cpp).
-	struct NativeRegistrationObf
-	{
-		uint64_t nextRegistration1;
-		uint64_t nextRegistration2;
-		ScriptEngine::NativeHandler handlers[7];
-		uint32_t numEntries1;
-		uint32_t numEntries2;
-		uint32_t pad;
-		uint64_t hashes[7 * 2];
-
-		NativeRegistrationObf* getNextRegistration() const
-		{
-			uintptr_t address = (uintptr_t)&nextRegistration1;
-			uint32_t key = (uint32_t)(address ^ nextRegistration2);
-			uint32_t low = (uint32_t)nextRegistration1 ^ key;
-			uint32_t high = (uint32_t)(nextRegistration1 >> 32) ^ key;
-			return (NativeRegistrationObf*)(((uint64_t)high << 32) | low);
-		}
-
-		uint32_t getNumEntries() const
-		{
-			return (uint32_t)(uintptr_t)&numEntries1 ^ numEntries1 ^ numEntries2;
-		}
-
-		uint64_t getHash(uint32_t index) const
-		{
-			uintptr_t address = (uintptr_t)&hashes[2 * index];
-			uint32_t key = (uint32_t)(address ^ (uint32_t)hashes[2 * index + 1]);
-			uint32_t low = (uint32_t)hashes[2 * index] ^ key;
-			uint32_t high = (uint32_t)(hashes[2 * index] >> 32) ^ key;
-			return ((uint64_t)high << 32) | low;
-		}
-	};
+	// Registration layout from 1.0.1290 on: shared/NativeRegistrationObf.h,
+	// pinned to the game's own lookup code (hash entries from +0x54, not the
+	// aligned +0x58 a struct member would give; that mistake made every
+	// lookup miss while the walk still counted all 6701 natives).
+	typedef orange::NativeRegistrationObf NativeRegistrationObf;
 
 	bool g_initialized = false;
 	bool g_obfuscated = false;
@@ -87,14 +56,14 @@ namespace
 		__try
 		{
 			int guard = 0;
-			for (NativeRegistrationObf* reg = (NativeRegistrationObf*)table[hash & 0xFF]; reg && guard < 4096; reg = reg->getNextRegistration(), ++guard)
+			for (const NativeRegistrationObf* reg = (const NativeRegistrationObf*)table[hash & 0xFF]; reg && guard < 4096; reg = reg->getNextRegistration(), ++guard)
 			{
 				uint32_t n = reg->getNumEntries();
 				if (n > 7)
 					break;
 				for (uint32_t i = 0; i < n; ++i)
 					if (reg->getHash(i) == hash)
-						return reg->handlers[i];
+						return (ScriptEngine::NativeHandler)reg->getHandler(i);
 			}
 		}
 		__except (EXCEPTION_EXECUTE_HANDLER)
@@ -114,7 +83,7 @@ namespace
 				int guard = 0;
 				if (obfuscated)
 				{
-					for (NativeRegistrationObf* reg = (NativeRegistrationObf*)table[bucket]; reg && guard < 4096; reg = reg->getNextRegistration(), ++guard)
+					for (const NativeRegistrationObf* reg = (const NativeRegistrationObf*)table[bucket]; reg && guard < 4096; reg = reg->getNextRegistration(), ++guard)
 					{
 						uint32_t n = reg->getNumEntries();
 						if (n > 7)
@@ -122,7 +91,7 @@ namespace
 						for (uint32_t i = 0; i < n && count < capacity; ++i)
 						{
 							hashes[count] = reg->getHash(i);
-							handlers[count] = (uint64_t)reg->handlers[i];
+							handlers[count] = (uint64_t)reg->getHandler(i);
 							++count;
 						}
 					}

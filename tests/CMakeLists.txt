@@ -32,3 +32,11 @@ set_target_properties(universal_crossmap_test PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/tests"
   FOLDER "tests")
 add_test(NAME universal_crossmap_test COMMAND universal_crossmap_test)
+
+# obfuscated native registration record decoding (shared/NativeRegistrationObf.h)
+add_executable(native_registration_test native_registration_test.cpp)
+target_include_directories(native_registration_test PRIVATE "${ORANGE_SHARED_DIR}")
+set_target_properties(native_registration_test PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/tests"
+  FOLDER "tests")
+add_test(NAME native_registration_test COMMAND native_registration_test)
