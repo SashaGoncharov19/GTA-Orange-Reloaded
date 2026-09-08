@@ -61,3 +61,10 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# GTA:Orange: files that are packaged for Linux by the Windows CI runner must
+# keep LF line endings, otherwise "env: 'bash\r': No such file or directory".
+###############################################################################
+*.sh        text eol=lf
+Dockerfile  text eol=lf
