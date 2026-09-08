@@ -124,6 +124,7 @@ summarize_update() {
 # failed run as the current state, so everything below looks at the last run
 # only: from the last "orange-core <version> loaded from ..." banner to the end.
 summarize_client_log() {
+	local marker
 	[ -f "$CLIENT_LOG" ] || { log "client.log was not written: orange-core.dll did not load inside GTA5.exe (see launcher.log)"; return; }
 
 	# The launcher says so when the DLL was already in the process: then the
@@ -133,6 +134,10 @@ summarize_client_log() {
 		log "         Windows hands back the module that is already there without running it again."
 		log "         Restart GTA V (not just this script) to load the current orange-core.dll."
 	fi
+
+	for marker in orange.nohooks orange.storymode orange.developer; do
+		[ -f "$CLIENT_DIR/$marker" ] && log "NOTE: $marker is present next to orange-core.dll and changes what it does."
+	done
 
 	local run
 	run="$(awk '/orange-core .* loaded from/ { block = "" } { block = block $0 "\n" } END { printf "%s", block }' "$CLIENT_LOG")"

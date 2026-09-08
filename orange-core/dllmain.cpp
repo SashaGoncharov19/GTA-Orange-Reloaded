@@ -55,19 +55,25 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 		// "orange.storymode" lets the game's own scripts keep running.
 		CGlobals::Get().isDeveloper = FileExists(CGlobals::Get().orangePath + "\\orange.developer");
 		CGlobals::Get().storyMode = FileExists(CGlobals::Get().orangePath + "\\orange.storymode");
+		// "orange.nohooks" resolves every offset and writes the log, but does
+		// not patch a single byte and installs no hook: the first step when the
+		// game refuses to start, to tell apart "the DLL is loaded" from "one of
+		// our changes broke it".
+		CGlobals::Get().noHooks = FileExists(CGlobals::Get().orangePath + "\\orange.nohooks");
 
 		my_ostream::SetLogFile(CGlobals::Get().orangePath + "/client.log");
 #ifndef ORANGE_VERSION
 #define ORANGE_VERSION "dev"
 #endif
 		log_info << "orange-core " << ORANGE_VERSION << " loaded from " << CGlobals::Get().orangePath
-			<< (CGlobals::Get().isDeveloper ? " (developer mode)" : "") << (CGlobals::Get().storyMode ? " (story mode)" : "") << std::endl;
+			<< (CGlobals::Get().isDeveloper ? " (developer mode)" : "") << (CGlobals::Get().storyMode ? " (story mode)" : "")
+			<< (CGlobals::Get().noHooks ? " (orange.nohooks: nothing will be patched or hooked)" : "") << std::endl;
 
 		bool patched = PreLoadPatches();
 		// The natives the game registered are dumped from OnGameReady (see
 		// orange-core.cpp): injection happens during the first loading screen,
 		// when the registration table is still empty.
-		if (patched)
+		if (patched && !CGlobals::Get().noHooks)
 			StartThread(InstallHooksThread, "the hook installation");
 		else
 		{

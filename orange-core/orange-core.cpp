@@ -621,6 +621,13 @@ bool PreLoadPatches()
 		log_error << "orange.developer present, applying patches anyway (this will most likely crash the game)" << std::endl;
 	}
 
+	if (CGlobals::Get().noHooks)
+	{
+		log_info << "orange.nohooks: the offsets above were resolved, but no byte is patched and no hook is installed. "
+			"Remove the file to run normally." << std::endl;
+		return true;
+	}
+
 	ImGui::GetIO().IniFilename = (CGlobals::Get().orangePath + "\\imgui.ini").c_str();
 	ImGui::GetIO().LogFilename = (CGlobals::Get().orangePath + "\\imgui_log.txt").c_str();
 
