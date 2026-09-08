@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GTA:Orange launcher settings -->
+<launcher>
+    <!--
+        Automatic updates, checked every time Launcher.exe starts:
+          enabled     true / false
+          channel     stable  = the latest GitHub release
+                      nightly = the latest build of the master branch
+          repository  GitHub repository that publishes the releases
+        Command line overrides: --no-update, --update, --channel nightly
+        Details are written to launcher.log next to Launcher.exe.
+    -->
+    <updates enabled="true" channel="stable" repository="SashaGoncharov19/GTA-Orange-Reloaded" />
+</launcher>

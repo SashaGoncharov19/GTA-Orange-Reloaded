@@ -73,8 +73,9 @@ bool binary_to_compressed_c(const char* filename, const char* symbol, bool use_b
 
 	// Output as Base85 encoded
 
-	FILE* out = stdout;
-	fopen_s(&out, "font.h", "w+");
+	FILE* out = fopen("font.h", "w+");
+	if (!out)
+		out = stdout;
 	fprintf(out, "// File: '%s' (%d bytes)\n", filename, (int)data_sz);
 	fprintf(out, "// Exported using binary_to_compressed_c.cpp\n");
 	const char* compressed_str = use_compression ? "compressed_" : "";
@@ -169,7 +170,7 @@ static void stb__write(unsigned char v)
 	++stb__outbytes;
 }
 
-#define stb_out(v)    (stb__out ? *stb__out++ = (stb_uchar) (v) : stb__write((stb_uchar) (v)))
+#define stb_out(v)    do { if (stb__out) *stb__out++ = (stb_uchar) (v); else stb__write((stb_uchar) (v)); } while (0)
 
 static void stb_out2(stb_uint v)
 {

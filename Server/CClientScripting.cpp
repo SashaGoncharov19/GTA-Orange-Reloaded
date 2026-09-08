@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#define log std::cout
 
 std::vector<CClientScript> CClientScripting::scripts;
 

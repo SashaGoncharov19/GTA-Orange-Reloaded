@@ -118,7 +118,9 @@ void OnGameStateChange(int gameState)
 		ScriptEngine::CreateThread(&g_ScriptManagerThread);
 		CScript::RunAll();
 
+#ifdef ORANGE_WITH_SCALEFORM
 		auto text = rage::ScaleformManager::CreateText("Test", { 0,0,200,200 }, NULL);
+#endif
 
 		//SyncTree::Init();
 		//log_debug << "CPlayerSyncTree: 0x" << std::hex << SyncTree::GetPlayerSyncTree() << std::endl;
@@ -240,8 +242,98 @@ void GameProcessHooks()
 	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x61F620).retn(); //ISABLE_COPS_AND_FIRE_TRUCKS_3
 }
 
-void PreLoadPatches()
+// ---------------------------------------------------------------------------
+// Game build check
+//
+// All hooks and patches above use hard-coded offsets into GTA5.exe that were
+// taken from the game build current in January 2017. Injecting them into any
+// other build would crash the game, so before touching anything we verify a
+// handful of byte signatures (the ones the original authors left next to the
+// offsets) at their expected locations.
+// ---------------------------------------------------------------------------
+struct GameSignature
 {
+	const char* name;
+	uintptr_t offset;
+	const char* pattern;   // "48 83 EC 28 ? ? 75 0F" style, '?' = wildcard
+};
+
+static const GameSignature g_gameSignatures[] = {
+	{ "ForceToSingle",       0x2773C,  "48 83 EC 28 85 D2 78 71 75 0F" },
+	{ "ForceToSingle_2",     0x186680, "48 83 EC 28 B9 ? ? ? ? E8 ? ? ? ? B9 ? ? ? ? E8 ? ? ? ? B1 01" },
+	{ "UnknownPatches_1",    0x1B348B, "48 85 C9 0F 84 ? 00 00 00 48 8D 55 A7 E8" },
+	{ "UnknownPatches_2",    0x1AE3A0, "E8 ? ? ? ? 8B CB 40 88 2D ? ? ? ?" },
+	{ "UnknownPatches_3",    0x1E6EF8, "48 89 5C 24 ? 57 48 83 EC 20 8B F9 8B DA" },
+};
+
+static bool MatchSignature(const BYTE* data, const char* pattern)
+{
+	std::stringstream ss(pattern);
+	std::string token;
+	while (ss >> token)
+	{
+		if (token != "?")
+		{
+			unsigned int value = std::stoul(token, nullptr, 16);
+			if (*data != (BYTE)value)
+				return false;
+		}
+		++data;
+	}
+	return true;
+}
+
+// Structured exception handling must live in a function without objects
+// that need unwinding (MSVC C2712), hence this tiny wrapper.
+static bool SafeMatchSignature(uintptr_t address, const char* pattern)
+{
+	__try
+	{
+		return MatchSignature((const BYTE*)address, pattern);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		return false;
+	}
+}
+
+static bool VerifyGameBuild()
+{
+	uintptr_t base = (uintptr_t)GetModuleHandle(NULL);
+	MODULEINFO info = { 0 };
+	GetModuleInformation(GetCurrentProcess(), GetModuleHandle(NULL), &info, sizeof(info));
+	size_t imageSize = info.SizeOfImage;
+
+	char exePath[MAX_PATH] = { 0 };
+	GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	log_info << "Game executable: " << exePath << " (image size 0x" << std::hex << imageSize << std::dec << ")" << std::endl;
+
+	bool ok = true;
+	for (const GameSignature& sig : g_gameSignatures)
+	{
+		bool match = false;
+		if (sig.offset + 64 < imageSize)
+			match = SafeMatchSignature(base + sig.offset, sig.pattern);
+		if (!match)
+		{
+			log_error << "Signature mismatch: " << sig.name << " at GTA5.exe+0x" << std::hex << sig.offset << std::dec << std::endl;
+			ok = false;
+		}
+	}
+	if (ok)
+		log_info << "Game build check passed" << std::endl;
+	return ok;
+}
+
+bool PreLoadPatches()
+{
+	if (!VerifyGameBuild())
+	{
+		if (!CGlobals::Get().isDeveloper)
+			return false;
+		log_error << "orange.developer present, applying patches anyway (this will most likely crash the game)" << std::endl;
+	}
+
 	ImGui::GetIO().IniFilename = (CGlobals::Get().orangePath + "\\imgui.ini").c_str();
 	ImGui::GetIO().LogFilename = (CGlobals::Get().orangePath + "\\imgui_log.txt").c_str();
 
@@ -253,4 +345,5 @@ void PreLoadPatches()
 	UnknownPatches();
 	HookLoop();
 	GameProcessHooks();
+	return true;
 }

@@ -68,7 +68,9 @@ static const struct luaL_Reg mfunclib[] = {
 	{ "OnHTTPReq", lua_HTTPReq },
 	{ "OnEvent", lua_Event },
 	{ "OnCommand", lua_Command },
+#ifndef _LUA_NOSQL
 	{ "SQLEnv", luaopen_luasql_mysql },
+#endif
 
 	{ "Create3DText", lua_Create3DText },
 	{ "Set3DTextText", lua_Set3DTextText },
@@ -168,17 +170,22 @@ bool SResource::Start(const char* name)
 
 char* SResource::OnHTTPRequest(const char* method, const char* url, const char* query, const char* body)
 {
+	if (!http)
+		return NULL;
 	return http(method, url, query, body);
 }
 
 bool SResource::OnTick()
 {
-	tick();
+	if (tick)
+		tick();
 	return true;
 }
 
 bool SResource::OnPlayerCommand(long playerid, const char* cmd)
 {
+	if (!oncommand)
+		return true;
 	return oncommand(playerid, cmd);
 }
 
@@ -206,6 +213,11 @@ void SResource::SetCommandProcessor(const std::function<bool(long pid, const cha
 bool SResource::OnKeyStateChanged(long playerid, int keycode, bool isUp)
 {
 	lua_getglobal(m_lua, "__OnKeyStateChanged");
+	if (lua_isnil(m_lua, -1))
+	{
+		lua_pop(m_lua, 1);
+		return true;
+	}
 
 	lua_pushinteger(m_lua, playerid);
 	lua_pushinteger(m_lua, keycode);
@@ -216,7 +228,11 @@ bool SResource::OnKeyStateChanged(long playerid, int keycode, bool isUp)
 	return true;
 }
 
-void SResource::OnEvent(const char* e, std::vector<MValue> *args) {	onevent(e, args); }
+void SResource::OnEvent(const char* e, std::vector<MValue> *args)
+{
+	if (onevent)
+		onevent(e, args);
+}
 
 SResource::~SResource()
 {

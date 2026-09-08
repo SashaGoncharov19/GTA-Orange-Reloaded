@@ -1,0 +1,3 @@
+# Resource descriptor. "type" selects the module that runs the resource;
+# lua-module registers the "lua" type and executes main.lua from this folder.
+type: lua

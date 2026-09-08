@@ -2,6 +2,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <math.h>
+#include <cmath>
+#include <cstring>
 #include <string>
 #include <locale>
 #include <vector>
@@ -13,17 +17,29 @@
 #include <thread>
 #include <iomanip>
 
-// Windows Header Files:
 #ifdef _WIN32
 
+// Windows Header Files:
 #define WIN32_LEAN_AND_MEAN
-
-#include <codecvt>
 #include <windows.h>
 #include <intrin.h>
 #include <Psapi.h>
 #include <direct.h>
 #include <TimeAPI.h>
+
+#else
+
+#include <unistd.h>
+
+// Win32 style type names used by the shared network structures. They must
+// keep the exact same size as on Windows because they travel over the wire.
+typedef uint32_t DWORD;
+typedef unsigned char BYTE;
+typedef unsigned int UINT;
+typedef unsigned long ULONG;
+#ifndef MAX_PATH
+#define MAX_PATH 260
+#endif
 
 #endif
 
@@ -33,13 +49,9 @@
 // Config
 #include "CConfig.h"
 
-#ifdef _WIN32
-
 // Logging
 #include <Console/CConsole.h>
 #include <CLog.h>
-
-#endif
 
 // RakNet
 #include <MessageIdentifiers.h>
@@ -55,17 +67,6 @@
 #include <RPC4Plugin.h>
 using namespace RakNet;
 
-
-#ifndef _WIN32
-
-typedef unsigned long DWORD;
-typedef unsigned char BYTE;
-typedef unsigned int UINT;
-typedef unsigned long ULONG;
-#define MAX_PATH 260
-
-#endif
-
 // Scripthook types
 #include <types.h>
 
@@ -76,13 +77,6 @@ typedef unsigned long ULONG;
 #include "CMath.h"
 #include "CVector3.h"
 #include "NetworkTypes.h"
-
-#ifndef _WIN32
-#define log std::cout
-#define log_debug std::cout
-#define log_info std::cout
-#define log_error std::cout
-#endif
 
 // RPC
 #include "CRPCPlugin.h"

@@ -65,19 +65,23 @@ bool CNetworkConnection::Start(unsigned short maxPlayers, unsigned short port)
 		socketDescriptors[0].socketFamily = AF_INET; // Test out IPV4
 		socketDescriptors[1].port = port;
 		socketDescriptors[1].socketFamily = AF_INET6; // Test out IPV6
+		// First try dual stack (IPv4 + IPv6). RakNet prints "Unknown bind__() error"
+		// itself when the IPv6 socket cannot be bound (no IPv6 on the host, e.g.
+		// inside containers); in that case we fall back to IPv4 only.
 		bool result = server->Startup(maxPlayers, socketDescriptors, 2) == RakNet::RAKNET_STARTED;
-		server->SetMaximumIncomingConnections(maxPlayers);
 		if (!result)
 		{
+			log << "IPv6 socket unavailable, falling back to IPv4 only" << std::endl;
 			result = server->Startup(maxPlayers, socketDescriptors, 1) == RakNet::RAKNET_STARTED;
 			if (!result)
 			{
-				log << "Server not started" << std::endl;
+				log_error << "Server not started: could not bind UDP port " << port << std::endl;
 				exit(EXIT_FAILURE);
 			}
 			else
-				log << "Server started" << std::endl;
-		} else log << "Server started in IPV4/IPV6 mode" << std::endl;
+				log << "Server started on UDP port " << port << " (IPv4)" << std::endl;
+		} else log << "Server started on UDP port " << port << " (IPv4 + IPv6)" << std::endl;
+		server->SetMaximumIncomingConnections(maxPlayers);
 		server->SetTimeoutTime(15000, RakNet::UNASSIGNED_SYSTEM_ADDRESS);
 		return true;
 	}

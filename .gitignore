@@ -267,3 +267,15 @@ CMakeCache.txt
 /HighFive/Launcher/libcef.dll
 /HighFive/Launcher/d3dcompiler_47.dll
 /HighFive/Launcher/d3dcompiler_43.dll
+
+###############################################################################
+# GTA:Orange (CMake based build)
+###############################################################################
+/build/
+/build-*/
+/out/
+/dist/
+/cmake-build-*/
+/.cache/
+compile_commands.json
+*.tar.gz

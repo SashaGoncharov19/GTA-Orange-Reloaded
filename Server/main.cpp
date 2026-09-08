@@ -1,25 +1,41 @@
 #include "stdafx.h"
 
-struct pass
-{
-	template<typename ...T> pass(T...) {}
-};
+#include <atomic>
+#include <chrono>
+#include <csignal>
+
+#ifndef _WIN32
+#include <sys/time.h>
+#endif
 
 int counter = 1;
 unsigned long createGUID() { return counter++; }
 
 #ifndef _WIN32
-#include <sys/time.h>
 unsigned long GetTickCount()
 {
-    struct timeval tv;
-    gettimeofday(&tv,NULL);
-    return (tv.tv_sec*1000+tv.tv_usec/1000);
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (tv.tv_sec * 1000 + tv.tv_usec / 1000);
 }
 #endif
 
+static std::atomic<bool> g_running(true);
+
+static void OnSignal(int)
+{
+	g_running = false;
+}
+
 int main(void)
 {
+	std::signal(SIGINT, OnSignal);
+	std::signal(SIGTERM, OnSignal);
+
+#ifndef ORANGE_VERSION
+#define ORANGE_VERSION "dev"
+#endif
+	log << "GTA:Orange server " << ORANGE_VERSION << std::endl;
 	log << "Starting the server..." << std::endl;
 	log << "Hostname: " << /*color::lred <<*/ CConfig::Get()->Hostname << std::endl;
 	log << "Port: " << /*color::lred <<*/ CConfig::Get()->Port << std::endl;
@@ -39,7 +55,7 @@ int main(void)
 		DWORD lastTick = 0;
 		RakNet::RakNetStatistics stat;
 
-		for (;;)
+		while (g_running)
 		{
 			RakSleep(5);
 			CNetworkConnection::Get()->Tick();
@@ -59,23 +75,32 @@ int main(void)
 		}
 	};
 	std::thread netThread(netLoop);
-	netThread.detach();
 
-	for (;;)
+	// Console loop. When stdin is not a terminal (systemd, Docker, nohup) the
+	// server simply keeps running until it receives SIGINT/SIGTERM.
+	std::string msg;
+	while (g_running)
 	{
-		std::string msg;
-		std::getline(std::cin, msg);
-		if (!msg.compare("exit") || !msg.compare("kill"))
+		if (!std::getline(std::cin, msg))
 		{
-			log << "Terminating server..." << std::endl;
+			while (g_running)
+				std::this_thread::sleep_for(std::chrono::milliseconds(200));
 			break;
 		}
-		else
+		if (!msg.compare("exit") || !msg.compare("kill"))
+		{
+			g_running = false;
+			break;
+		}
+		else if (!msg.empty())
 		{
 			Plugin::ServerCommand(msg);
 		}
 	}
-	netThread.~thread();
-	//delete Python::Get();
+
+	log << "Terminating server..." << std::endl;
+	g_running = false;
+	if (netThread.joinable())
+		netThread.join();
 	return 0;
 }

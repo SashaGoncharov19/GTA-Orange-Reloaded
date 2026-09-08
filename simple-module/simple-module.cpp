@@ -5,13 +5,13 @@ API * API::instance = nullptr;
 
 extern "C"
 {
-	__declspec(dllexport) bool Validate(API * api)
+	ORANGE_EXPORT bool Validate(API * api)
 	{
 		API::Set(api);
 		return true;
 	}
 
-	__declspec(dllexport) void OnModuleInit()
+	ORANGE_EXPORT void OnModuleInit()
 	{
 		API::Get().Print("Simple module has been successfully loaded!");
 
@@ -23,7 +23,7 @@ extern "C"
 		API::Get().Print("All cars were loaded!");
 	}
 
-	__declspec(dllexport) bool OnPlayerConnect(long playerid)
+	ORANGE_EXPORT bool OnPlayerConnect(long playerid)
 	{
 		std::stringstream message;
 		message << "Player " << API::Get().GetPlayerName(playerid) << " joined the server!";
@@ -37,13 +37,13 @@ extern "C"
 		return true;
 	}
 
-	__declspec(dllexport) bool OnServerCommand(std::string command)
+	ORANGE_EXPORT bool OnServerCommand(std::string command)
 	{
 
 		return true;
 	}
 
-	__declspec(dllexport) bool OnPlayerDisconnect(long playerid, int reason)
+	ORANGE_EXPORT bool OnPlayerDisconnect(long playerid, int reason)
 	{
 		std::stringstream message;
 		message << "Player  " << API::Get().GetPlayerName(playerid) << " left the server(" << ((reason == 1) ? "Disconnected" : "Timeout") << ")!";
@@ -51,19 +51,19 @@ extern "C"
 		return true;
 	}
 
-	__declspec(dllexport) bool OnPlayerUpdate(long playerid)
+	ORANGE_EXPORT bool OnPlayerUpdate(long playerid)
 	{
 
 		return true;
 	}
 
-	__declspec(dllexport) bool OnPlayerCommand(long playerid, const char * command)
+	ORANGE_EXPORT bool OnPlayerCommand(long playerid, const char * command)
 	{
 
 		return true;
 	}
 
-	__declspec(dllexport) bool OnPlayerText(long playerid, const char * text)
+	ORANGE_EXPORT bool OnPlayerText(long playerid, const char * text)
 	{
 
 		return true;

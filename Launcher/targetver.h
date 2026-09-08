@@ -1,11 +1,11 @@
 #pragma once
 
-// Включение SDKDDKVer.h обеспечивает определение самой последней доступной платформы Windows.
-
-// Если требуется выполнить сборку приложения для предыдущей версии Windows, включите WinSDKVer.h и
-// задайте для макроса _WIN32_WINNT значение поддерживаемой платформы перед включением SDKDDKVer.h.
+// Target Windows 7 and newer. These must be defined before SDKDDKVer.h.
+#ifndef WINVER
+#define WINVER 0x0601
+#endif
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0601
+#endif
 
 #include <SDKDDKVer.h>
-
-#define WINVER 0x0601  
-#define _WIN32_WINNT 0x0601

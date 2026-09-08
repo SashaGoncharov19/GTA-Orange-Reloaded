@@ -10,6 +10,8 @@
 
 #pragma once
 #include <cmath>
+#include <string>
+#include <sstream>
 
 #include <xmmintrin.h>
 inline void vmul_sse(const float *a, const float b, float *r)

@@ -1,0 +1,303 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Create a release with this tag (e.g. v0.2.0). Leave empty for a plain build."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}-${{ github.event.inputs.release_tag }}
+  cancel-in-progress: true
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Dedicated server for Linux. Built inside ubuntu:22.04 so the binaries run
+  # on any distribution with glibc >= 2.35 (Ubuntu 22.04+, Debian 12+, ...).
+  # ---------------------------------------------------------------------------
+  server-linux:
+    name: Server (Linux x64)
+    runs-on: ubuntu-latest
+    container: ubuntu:22.04
+    steps:
+      - name: Install toolchain
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build git ca-certificates curl tar \
+            libmysqlclient-dev
+
+      - uses: actions/checkout@v4
+
+      - name: Version
+        shell: bash
+        run: |
+          if [[ -n "$RELEASE_TAG" ]]; then v="${RELEASE_TAG#v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"
+          else v="nightly-$(date -u +%Y%m%d)-${GITHUB_SHA::7}"; fi
+          echo "ORANGE_VERSION=$v" >> "$GITHUB_ENV"
+          echo "version: $v"
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DORANGE_BUILD_CLIENT=OFF -DORANGE_VERSION_STRING="$ORANGE_VERSION"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Unit tests
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Install
+        run: |
+          cmake --install build --prefix "$PWD/dist" --component server
+          echo "$ORANGE_VERSION" > server-version.txt
+
+      - name: Smoke test
+        run: |
+          cd dist/server
+          (timeout 10 ./orange_server < /dev/null > server.log 2>&1 || true) &
+          sleep 4
+          curl -sf http://127.0.0.1:7789/ | tee http.txt
+          grep -q "running" http.txt
+          wait
+          echo "----- server.log -----"
+          cat server.log
+          grep -q "Server started" server.log
+          grep -q "resource started" server.log
+          rm -f server.log http.txt
+
+      - name: Package
+        run: tar -C dist -czf gta-orange-server-linux-x64.tar.gz server
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gta-orange-server-linux-x64
+          path: gta-orange-server-linux-x64.tar.gz
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gta-orange-server-version
+          path: server-version.txt
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Windows: dedicated server + the game client (Launcher.exe, orange-core.dll)
+  # ---------------------------------------------------------------------------
+  windows:
+    name: Server + Client (Windows x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Version
+        shell: bash
+        run: |
+          if [[ -n "$RELEASE_TAG" ]]; then v="${RELEASE_TAG#v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"
+          else v="nightly-$(date -u +%Y%m%d)-${GITHUB_SHA::7}"; fi
+          echo "ORANGE_VERSION=$v" >> "$GITHUB_ENV"
+          echo "version: $v"
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DORANGE_BUILD_CLIENT=ON -DORANGE_VERSION_STRING="$env:ORANGE_VERSION"
+
+      - name: Build
+        run: cmake --build build --parallel -- -k 0
+
+      - name: Unit tests
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Install
+        run: |
+          cmake --install build --prefix "${{ github.workspace }}/dist" --component server
+          cmake --install build --prefix "${{ github.workspace }}/dist" --component client
+
+      - name: Client update manifest
+        shell: pwsh
+        run: |
+          $lines = @("# GTA:Orange client update manifest", "version $env:ORANGE_VERSION")
+          foreach ($f in @("orange-core.dll", "Launcher.exe")) {
+            $hash = (Get-FileHash -Algorithm SHA256 "dist/client/$f").Hash.ToLower()
+            $size = (Get-Item "dist/client/$f").Length
+            $lines += "file $f $hash $size"
+          }
+          ($lines -join "`n") + "`n" | Set-Content -NoNewline -Encoding ascii dist/client/client-manifest.txt
+          Get-Content dist/client/client-manifest.txt
+          New-Item -ItemType Directory client-files | Out-Null
+          Copy-Item dist/client/orange-core.dll, dist/client/Launcher.exe, dist/client/client-manifest.txt client-files/
+
+      - name: Smoke test server
+        shell: pwsh
+        run: |
+          Set-Location dist/server
+          New-Item -ItemType File -Path stdin.txt -Force | Out-Null
+          $p = Start-Process -FilePath ".\orange_server.exe" -RedirectStandardInput stdin.txt -RedirectStandardOutput server.log -RedirectStandardError server.err -PassThru -NoNewWindow
+          Start-Sleep -Seconds 6
+          $r = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:7789/
+          Write-Host "HTTP: $($r.Content)"
+          Stop-Process -Id $p.Id -Force
+          Start-Sleep -Seconds 1
+          Write-Host "----- server.log -----"
+          Get-Content server.log
+          if ($r.Content -notmatch "running") { throw "unexpected HTTP response" }
+          if (-not (Select-String -Path server.log -Pattern "Server started" -Quiet)) { throw "server did not start" }
+          Remove-Item stdin.txt, server.log, server.err -ErrorAction SilentlyContinue
+
+      - name: Add Proton helper to the client package
+        shell: pwsh
+        run: Copy-Item tools/proton/gta-orange-proton.sh dist/client/
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/server -DestinationPath gta-orange-server-win64.zip
+          Compress-Archive -Path dist/client -DestinationPath gta-orange-client-win64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gta-orange-server-win64
+          path: gta-orange-server-win64.zip
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gta-orange-client-win64
+          path: gta-orange-client-win64.zip
+          if-no-files-found: error
+
+      # individual files consumed by the launcher's auto-updater
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gta-orange-client-files
+          path: client-files/*
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Downloads: every push to master refreshes the rolling "nightly" pre-release,
+  # every v* tag creates a proper release.
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish downloads
+    needs: [server-linux, windows]
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: gta-orange-*
+          merge-multiple: true
+
+      - name: List downloads
+        run: ls -la artifacts
+
+      # A "v*" tag push, or a manual run with release_tag set (the tag is then
+      # created by gh on the built commit, handy when tags cannot be pushed).
+      - name: Tagged release
+        if: startsWith(github.ref, 'refs/tags/v') || env.RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${RELEASE_TAG:-$GITHUB_REF_NAME}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" artifacts/* --clobber
+          else
+            gh release create "$TAG" artifacts/* --title "GTA:Orange $TAG" --generate-notes --target "$GITHUB_SHA"
+          fi
+
+      - name: Nightly release
+        if: github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f nightly "$GITHUB_SHA"
+          git push -f origin nightly
+          NOTES="Automated build of \`master\` @ ${GITHUB_SHA} ($(date -u +'%Y-%m-%d %H:%M UTC')).
+
+          * \`gta-orange-server-linux-x64.tar.gz\` - dedicated server for Linux (glibc >= 2.35)
+          * \`gta-orange-server-win64.zip\` - dedicated server for Windows
+          * \`gta-orange-client-win64.zip\` - game client (Launcher.exe + orange-core.dll) + Proton helper script
+          * \`client-manifest.txt\`, \`orange-core.dll\`, \`Launcher.exe\`, \`server-version.txt\` - used by the auto-updater (Launcher.exe, update-server.sh/.ps1)
+
+          See docs/LINUX_PROTON.md for Linux/Proton instructions."
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release edit nightly --prerelease --title "Nightly build" --notes "$NOTES" --target "$GITHUB_SHA"
+          else
+            gh release create nightly --prerelease --title "Nightly build" --notes "$NOTES" --target "$GITHUB_SHA"
+          fi
+          gh release upload nightly artifacts/* --clobber
+
+  # ---------------------------------------------------------------------------
+  # Server Docker image -> GitHub Container Registry
+  # ---------------------------------------------------------------------------
+  docker:
+    name: Server Docker image
+    needs: [server-linux]
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image name (registry names must be lowercase)
+        id: image
+        run: |
+          echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/server" >> "$GITHUB_OUTPUT"
+          echo "release=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=nightly,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ steps.image.outputs.release }},enable=${{ steps.image.outputs.release != '' }}
+            type=sha
+
+      - uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: .
+          push: true
+          build-args: |
+            ORANGE_VERSION_STRING=${{ steps.image.outputs.release || format('nightly-{0}', github.sha) }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
