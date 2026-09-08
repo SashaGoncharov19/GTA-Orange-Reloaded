@@ -14,12 +14,18 @@
 //
 // Settings come from launcher.xml next to Launcher.exe (see runtime/client)
 // and can be overridden with --no-update / --update / --channel <name>.
+//
+// A build never changes channel on its own: a nightly build only follows the
+// nightly pre-release and a release only the stable releases. Otherwise a
+// nightly client would be "updated" to the older stable release. Switching
+// needs an explicit --channel <name> (or --update) on the command line.
 
 struct UpdaterSettings
 {
 	bool enabled = true;
-	bool force = false;                 // update even a "-dev" build
-	std::wstring channel = L"stable";   // "stable" (latest release) or "nightly"
+	bool force = false;                 // update even a "-dev" build, allow changing channel
+	std::wstring channel;               // "stable" / "nightly"; empty = the channel of this build
+	bool channelExplicit = false;       // --channel given on the command line
 	std::wstring repository = L"SashaGoncharov19/GTA-Orange-Reloaded";
 };
 

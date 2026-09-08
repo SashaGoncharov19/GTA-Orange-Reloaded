@@ -70,6 +70,14 @@ int main()
 	CHECK(!IsDevVersion("0.2.0"));
 	CHECK(!IsDevVersion("nightly-20260908-f15d9d3"));
 
+	CHECK(IsNightlyVersion("nightly-20260908-f15d9d3"));
+	CHECK(!IsNightlyVersion("0.2.0"));
+	CHECK(!IsNightlyVersion("nightly"));
+	CHECK(!IsNightlyVersion(""));
+	CHECK(std::string(DefaultChannelFor("nightly-20260908-f15d9d3")) == "nightly");
+	CHECK(std::string(DefaultChannelFor("0.2.0")) == "stable");
+	CHECK(std::string(DefaultChannelFor("0.2.0-dev")) == "stable");
+
 	if (g_failures == 0)
 		std::printf("manifest_test: all checks passed\n");
 	return g_failures == 0 ? 0 : 1;

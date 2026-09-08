@@ -87,10 +87,15 @@ Nothing has to be downloaded by hand after the first install:
   release, `nightly` = latest `master` build), compares SHA-256 hashes with the
   local `orange-core.dll` / `Launcher.exe`, downloads what changed, verifies it
   and swaps the files in place (the launcher replaces itself and restarts).
-  Configure it in `launcher.xml` next to the launcher or with `--no-update`,
-  `--update`, `--channel nightly`. Everything is logged to `launcher.log`.
-  A failed update check never blocks the game start. Development builds
-  (`-dev` version) are left alone unless `--update` is given.
+  A build follows the channel it came from (a nightly client tracks the
+  `nightly` pre-release, a release tracks the stable releases) and never
+  switches channels on its own; to move an installation run
+  `Launcher.exe --channel nightly --update` (or `--channel stable --update`)
+  once. Configure it in `launcher.xml` next to the launcher or with
+  `--no-update`, `--update`, `--channel <name>`. Everything is logged to
+  `launcher.log`. A failed update check never blocks the game start.
+  Development builds (`-dev` version) are left alone unless `--update` is
+  given.
 * **Server:** run `./update-server.sh` (Linux) or `.\update-server.ps1`
   (Windows) inside the server folder. The scripts compare `version.txt` with
   `server-version.txt` of the release, replace the binaries, the Lua API

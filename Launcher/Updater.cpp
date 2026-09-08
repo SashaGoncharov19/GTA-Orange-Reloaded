@@ -248,6 +248,8 @@ bool Updater::WriteWholeFile(const std::wstring& path, const std::vector<char>& 
 UpdateResult Updater::Run()
 {
 	m_error.clear();
+	if (m_settings.channel.empty())
+		m_settings.channel = Widen(DefaultChannelFor(m_localVersion));
 	if (!m_settings.enabled)
 	{
 		LauncherLog("updater: disabled in launcher.xml / --no-update");
@@ -275,6 +277,15 @@ UpdateResult Updater::Run()
 	}
 	m_remoteVersion = manifest.version;
 	LauncherLog("updater: local version " + m_localVersion + ", remote version " + manifest.version);
+
+	// Never move between channels on our own (a nightly client on the stable
+	// channel would be downgraded to the older release).
+	if (IsNightlyVersion(m_localVersion) != IsNightlyVersion(manifest.version) && !m_settings.force && !m_settings.channelExplicit)
+	{
+		LauncherLog("updater: " + manifest.version + " belongs to a different channel than this build (" + m_localVersion
+			+ "), not switching automatically; run Launcher.exe --channel " + Narrow(m_settings.channel) + " --update to switch");
+		return UpdateResult::Skipped;
+	}
 
 	std::vector<const UpdateFile*> outdated;
 	for (const UpdateFile& file : manifest.files)
