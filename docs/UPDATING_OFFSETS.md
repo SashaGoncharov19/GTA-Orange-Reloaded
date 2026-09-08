@@ -160,11 +160,12 @@ enough to find the new location.
 
 Updating the addresses is necessary but not sufficient for a modern build:
 
-* **Native hashes.** `orange-core/Core/Natives.h` calls natives by the hash
-  of the reference build (Rockstar changes the hashes every update; the
-  original hash is kept in the comment of each line). A current build needs a
-  translation table from those hashes to the new ones - the lookup happens in
-  `ScriptEngine::GetNativeHandler()`, which is the place to add such a table.
+* **Native hashes.** `orange-core/Core/Natives.h` calls natives by their
+  canonical hash; `Core/NativeTable.cpp` translates it to the running build
+  (built-in table for the reference build, `natives-<version>.txt` next to
+  the DLL for others) and walks the plain or obfuscated registration table.
+  Producing that file for a new build is described in
+  `docs/PORTING_STATUS.md`.
 * **Structure layouts.** `GTA/CRage.h`, `Core/scrThread.h`, the task
   serialisation and the sync code read game structures by fixed member
   offsets. Those move as well.

@@ -610,6 +610,14 @@ bool Initialize()
 }
 
 bool IsInitialized() { return g_initialized; }
+
+int GameBuildNumber()
+{
+	unsigned a = 0, b = 0, c = 0, d = 0;
+	if (sscanf_s(g_gameVersion.c_str(), "%u.%u.%u.%u", &a, &b, &c, &d) < 3)
+		return 0;
+	return (int)c;
+}
 bool IsReferenceBuild() { return g_referenceBuild; }
 const std::string& GameVersion() { return g_gameVersion; }
 const std::vector<Status>& All() { return g_status; }
