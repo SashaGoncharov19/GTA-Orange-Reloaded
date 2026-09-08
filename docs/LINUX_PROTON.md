@@ -110,6 +110,13 @@ Windows binaries and writes the new version into `version.txt`.
 5. `./gta-orange-proton.sh --logs` explains the run afterwards, including
    the connection.
 
+Once connected the world is the multiplayer one: the single player scripts
+are terminated (their blips and missions go), no ambient peds or traffic
+spawn, no police come, and the pause menu stays closed because in single
+player it would freeze the game (so no map for now; `/quit` in the chat
+leaves the game). `orange.storymode` next to the DLL keeps all of that as
+the story mode has it.
+
 Delete an `orange.storymode` file next to `orange-core.dll` if one is left
 from earlier experiments: with it the single player scripts keep running
 (HUD, missions, story) next to GTA:Orange.

@@ -145,6 +145,19 @@ Tick and script id hooks pass everything through).
    move by teleport-interpolation only (`CNetworkPlayer::AssignTask` is
    refused off the reference build), and the remaining 2017 structure reads
    (aim, tasks, `CPed` writes for remote peds) are wrong until item 1 is done.
+   **Confirmed on 2026-09-09**: spawn, cars, blip, marker, `/car`, chat all
+   work. What the session still showed of the single player world is done
+   with natives now (`Scripts/WorldScript.cpp`, `ScriptEngine::TakeOver`):
+   the living stock scripts are cleaned up and terminated the game's way
+   (`FORCE_CLEANUP_FOR_ALL_THREADS_WITH_THIS_NAME` + `TERMINATE_ALL_SCRIPTS_WITH_THIS_NAME`,
+   the 2017 route through direct function pointers only worked on the
+   reference build), except the four HUD helpers the 2017 list kept; the
+   ambient population, police dispatch and wanted level are off (population
+   budgets and the per-frame density multipliers; the 2017 client patched
+   bytes for that), leftover blips are removed, and the frontend stays closed
+   (`DISABLE_FRONTEND_THIS_FRAME`: in single player the pause menu freezes
+   the game; a network session of the game would not, and GTA:Orange has
+   none yet, so no pause menu and no map for now, `/quit` leaves).
 4. `ReplayInterfaces`, `ViewportGame` and the gameplay patches
    (`GameProcessHooks`) have no patterns; only the debug pool overlay and the
    cosmetic patches depend on them.

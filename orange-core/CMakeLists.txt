@@ -64,6 +64,7 @@ set(ORANGE_CORE_SOURCES
   Scripts/GameInit.cpp
   Scripts/NetworkScript.cpp
   Scripts/ScriptDispatcher.cpp
+  Scripts/WorldScript.cpp
   ServerBrowser.cpp
   stdafx.cpp
   Utils.cpp
