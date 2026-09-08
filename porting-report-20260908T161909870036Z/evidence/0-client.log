@@ -1,0 +1,106 @@
+
+[09/08/26 13:36:04] [Info] orange-core nightly-20260908-f0f3058 loaded from Z:\home\sviatoslav\gta-orange\client
+[09/08/26 13:36:04] [Info] Game executable: S:\steamapps\common\Grand Theft Auto V\GTA5.exe
+[09/08/26 13:36:04] [Info] Game version: 1.0.3889.0, image base 0x140000000, image size 0x3E5BC00
+[09/08/26 13:36:04] [Info] Reference signature ForceToSingle does not match at GTA5.exe+0x2773C
+[09/08/26 13:36:04] [Info] Reference signature ForceToSingle_2 does not match at GTA5.exe+0x186680
+[09/08/26 13:36:04] [Info] Reference signature UnknownPatch_1 does not match at GTA5.exe+0x1B348B
+[09/08/26 13:36:04] [Info] Reference signature UnknownPatch_2 does not match at GTA5.exe+0x1AE3A0
+[09/08/26 13:36:04] [Info] Reference signature UnknownPatch_3 does not match at GTA5.exe+0x1E6EF8
+[09/08/26 13:36:04] [Info] Game build check: NOT the reference build, offsets must come from offsets.ini or pattern scans
+[09/08/26 13:36:04] [Info] offsets.ini loaded: 0 section(s), no section for this game version
+[09/08/26 13:36:04] [Info] offset StartupPatch: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:04] [Debug] offset ForceToSingle = 0x2A730 (built-in pattern)
+[09/08/26 13:36:04] [Debug] offset ForceToSingle_2 = 0x2CA3E0 (built-in pattern)
+[09/08/26 13:36:04] [Debug] offset UnknownPatch_1 = 0x2D1D14 (built-in pattern)
+[09/08/26 13:36:04] [Info] offset UnknownPatch_2: unresolved (optional, skipped) - built-in pattern not found
+[09/08/26 13:36:05] [Debug] offset UnknownPatch_3 = 0x2E2EAC (built-in pattern)
+[09/08/26 13:36:05] [Info] offset UnknownPatch_4: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset UnknownPatch_5: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset UnknownPatch_6: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset UnknownPatch_7: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset UnknownPatch_8: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset CheckMultiplayerByteDrawMapFrame: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset UnknownPatch_9: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset UnknownPatch_10: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset ForceCleanupForAllThreadsWithThisName: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset TerminateAllScriptsWithThisName: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset ShutdownLoadingScreen: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset DoScreenFadeIn: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset HasScriptLoaded: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset CanLangChange: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset InitializeOnline: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset InitHUD: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset EventHook: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset CodeCave: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset LookAliveCall: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset GameStateChangeCall: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset WindowCreateCall: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset BeginDisplayCall: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset ObjectsPatch: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset EscFreeze: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset CheatConsole: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset UIWheelSlowmo: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset ShowCursor_1: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset ShowCursor_2: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset RockstarLoadingLogo: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset Tooltips: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset SocialClubNews: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisableWantedGeneration_1: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisableWantedGeneration_2: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset IntentionalCrash: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset CrashLoadModelsTooQuickly: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset CreateNetworkEventBindings: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset LoadNewGame: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset ResetVehicleDensityLastFrame: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset VarVehicleDensity: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset SetClockForwardAfterDeath: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisableNorthBlip: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisableVehicleResetAtSetPosition: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisableLoadingMpDlcContent: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset RuntimeExecutableImportsCheck: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisablePopulationVehicles_10: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisablePopulationVehicles_8: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisablePopulationVehicles_11a: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisablePopulationVehicles_11b: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisablePopulationPeds_1: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisablePopulationPeds_2: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisablePopulationAmbientPeds: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisablePopulationPeds_4: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisableCopsAndFireTrucks_1: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisableCopsAndFireTrucks_2: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset DisableCopsAndFireTrucks_3: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset SnowPatch: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset ScrThreadCollection: UNRESOLVED (required) - built-in pattern not found
+[09/08/26 13:36:05] [Error] offset ActiveThreadTlsOffset: UNRESOLVED (required) - built-in pattern not found
+[09/08/26 13:36:05] [Error] offset ScrThreadId: UNRESOLVED (required) - built-in pattern not found
+[09/08/26 13:36:05] [Error] offset ScrThreadCount: UNRESOLVED (required) - built-in pattern not found
+[09/08/26 13:36:05] [Error] offset RegistrationTable: UNRESOLVED (required) - built-in pattern not found
+[09/08/26 13:36:05] [Debug] offset ScriptHandlerMgr = 0xA5ACBC (built-in pattern)
+[09/08/26 13:36:05] [Error] offset GetScriptIdBlock: UNRESOLVED (required) - built-in pattern not found
+[09/08/26 13:36:05] [Error] offset ScriptThreadTick: UNRESOLVED (required) - built-in pattern not found
+[09/08/26 13:36:05] [Debug] offset ScriptThreadKill = 0xA5AA04 (built-in pattern)
+[09/08/26 13:36:05] [Error] offset ScriptThreadInit: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset PlayerColor: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset ViewportGame: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset GetEntityFromScriptHandle: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset World: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset VehicleFactory: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset ReplayInterfaces: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset GetEntityAddressCall: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset HeapTask: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset HeapTaskClone: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset SysAllocate: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset SysFree: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset CreateTaskInfoById: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset RageBufferInit: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset RageBufferInitRead: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset ShowAbilityBar: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Error] offset SwapChain: UNRESOLVED (required) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset ScaleformManager: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] offset ScaleformCreateText: unresolved (optional, skipped) - no pattern known for this entry
+[09/08/26 13:36:05] [Info] Offsets: 90 total, 0 reference, 0 from offsets.ini, 6 by pattern, 0 disabled, 84 unresolved (25 required)
+[09/08/26 13:36:06] [Info] Offsets template written to Z:\home\sviatoslav\gta-orange\client\offsets-1.0.3889.0.generated.ini
+[09/08/26 13:36:06] [Error] 25 required offset(s) unknown for game version 1.0.3889.0: ForceCleanupForAllThreadsWithThisName, TerminateAllScriptsWithThisName, ShutdownLoadingScreen, DoScreenFadeIn, HasScriptLoaded, CanLangChange, InitHUD, CodeCave, LookAliveCall, GameStateChangeCall, WindowCreateCall, ScrThreadCollection, ActiveThreadTlsOffset, ScrThreadId, ScrThreadCount, RegistrationTable, GetScriptIdBlock, ScriptThreadTick, ScriptThreadInit, ViewportGame, GetEntityFromScriptHandle, World, ReplayInterfaces, GetEntityAddressCall, SwapChain
+[09/08/26 13:36:06] [Error] Fill them in offsets.ini (a template was written next to orange-core.dll), see docs/UPDATING_OFFSETS.md
+[09/08/26 13:36:06] [Error] Game build check failed, GTA:Orange stays inactive

@@ -1,0 +1,114 @@
+[2026-09-08 12:28:08] ---- GTA:Orange Launcher nightly-20260908-8a23797 started ----
+[2026-09-08 12:28:08] ---- Launcher nightly-20260908-8a23797 starting ----
+[2026-09-08 12:28:08] launcher folder: Z:\home\sviatoslav\gta-orange\client
+[2026-09-08 12:28:08] command line: "Z:\home\sviatoslav\gta-orange\client\Launcher.exe" --inject --timeout 600
+[2026-09-08 12:28:08] mode: inject into a running GTA5.exe (--inject), wait for unpack: yes, timeout: 600s, update check: yes
+[2026-09-08 12:28:08] update check: channel stable, repository SashaGoncharov19/GTA-Orange-Reloaded
+[2026-09-08 12:28:08] updater: channel stable, manifest https://github.com/SashaGoncharov19/GTA-Orange-Reloaded/releases/latest/download/client-manifest.txt
+[2026-09-08 12:28:09] updater: local version nightly-20260908-8a23797, remote version 0.2.0
+[2026-09-08 12:28:09] updater: downloading orange-core.dll
+[2026-09-08 12:28:10] updater: downloading Launcher.exe
+[2026-09-08 12:28:12] updater: installed orange-core.dll
+[2026-09-08 12:28:12] updater: installed Launcher.exe
+[2026-09-08 12:28:12] updater: updated to version 0.2.0 (restart required)
+[2026-09-08 12:28:12] updater: launcher updated, restart required
+[2026-09-08 12:28:12] restarting after self-update
+[2026-09-08 12:28:12] ---- GTA:Orange Launcher 0.2.0 started ----
+[2026-09-08 12:30:25] ---- GTA:Orange Launcher 0.2.0 started ----
+[2026-09-08 12:30:25] updater: channel stable, manifest https://github.com/SashaGoncharov19/GTA-Orange-Reloaded/releases/latest/download/client-manifest.txt
+[2026-09-08 12:30:26] updater: local version 0.2.0, remote version 0.2.0
+[2026-09-08 12:30:26] updater: up to date
+[2026-09-08 12:36:16] ---- GTA:Orange Launcher 0.2.0 started ----
+[2026-09-08 12:36:16] updater: channel stable, manifest https://github.com/SashaGoncharov19/GTA-Orange-Reloaded/releases/latest/download/client-manifest.txt
+[2026-09-08 12:36:17] updater: local version 0.2.0, remote version 0.2.0
+[2026-09-08 12:36:17] updater: up to date
+[2026-09-08 12:59:55] ---- GTA:Orange Launcher 0.2.0 started ----
+[2026-09-08 12:59:55] updater: channel stable, manifest https://github.com/SashaGoncharov19/GTA-Orange-Reloaded/releases/latest/download/client-manifest.txt
+[2026-09-08 12:59:56] updater: local version 0.2.0, remote version 0.2.0
+[2026-09-08 12:59:56] updater: up to date
+[2026-09-08 13:08:53] ---- GTA:Orange Launcher nightly-20260908-f1adfa4 started ----
+[2026-09-08 13:08:53] ---- Launcher nightly-20260908-f1adfa4 starting ----
+[2026-09-08 13:08:53] launcher folder: Z:\home\sviatoslav\gta-orange\client
+[2026-09-08 13:08:53] command line: "Z:\home\sviatoslav\gta-orange\client\Launcher.exe" --inject --timeout 600
+[2026-09-08 13:08:53] mode: inject into a running GTA5.exe (--inject), wait for unpack: yes, timeout: 600s, update check: yes
+[2026-09-08 13:08:53] update check: channel nightly, repository SashaGoncharov19/GTA-Orange-Reloaded
+[2026-09-08 13:08:53] updater: channel nightly, manifest https://github.com/SashaGoncharov19/GTA-Orange-Reloaded/releases/download/nightly/client-manifest.txt
+[2026-09-08 13:08:53] updater: local version nightly-20260908-f1adfa4, remote version nightly-20260908-f1adfa4
+[2026-09-08 13:08:54] updater: up to date
+[2026-09-08 13:08:54] updater: client is up to date
+[2026-09-08 13:08:54] library to inject: Z:\home\sviatoslav\gta-orange\client\orange-core.dll
+[2026-09-08 13:08:54] waiting for GTA5.exe (up to 600s)
+[2026-09-08 13:08:54] GTA5.exe is running, pid 1864
+[2026-09-08 13:08:54] inject: GTA5.exe pid 1864
+[2026-09-08 13:08:54] inject: waiting for the executable to be unpacked (up to 120s)
+[2026-09-08 13:11:45] ---- GTA:Orange Launcher nightly-20260908-f1adfa4 started ----
+[2026-09-08 13:11:45] ---- Launcher nightly-20260908-f1adfa4 starting ----
+[2026-09-08 13:11:45] launcher folder: Z:\home\sviatoslav\gta-orange\client
+[2026-09-08 13:11:45] command line: "Z:\home\sviatoslav\gta-orange\client\Launcher.exe" --inject --timeout 600
+[2026-09-08 13:11:45] mode: inject into a running GTA5.exe (--inject), wait for unpack: yes, timeout: 600s, update check: yes
+[2026-09-08 13:11:45] update check: channel nightly, repository SashaGoncharov19/GTA-Orange-Reloaded
+[2026-09-08 13:11:45] updater: channel nightly, manifest https://github.com/SashaGoncharov19/GTA-Orange-Reloaded/releases/download/nightly/client-manifest.txt
+[2026-09-08 13:11:46] updater: local version nightly-20260908-f1adfa4, remote version nightly-20260908-f1adfa4
+[2026-09-08 13:11:46] updater: up to date
+[2026-09-08 13:11:46] updater: client is up to date
+[2026-09-08 13:11:46] library to inject: Z:\home\sviatoslav\gta-orange\client\orange-core.dll
+[2026-09-08 13:11:46] waiting for GTA5.exe (up to 600s)
+[2026-09-08 13:11:46] GTA5.exe is running, pid 1848
+[2026-09-08 13:11:46] inject: GTA5.exe pid 1848
+[2026-09-08 13:11:46] inject: waiting for the executable to be unpacked (up to 120s)
+[2026-09-08 13:15:07] ---- GTA:Orange Launcher nightly-20260908-f1adfa4 started ----
+[2026-09-08 13:15:07] ---- Launcher nightly-20260908-f1adfa4 starting ----
+[2026-09-08 13:15:07] launcher folder: Z:\home\sviatoslav\gta-orange\client
+[2026-09-08 13:15:07] command line: "Z:\home\sviatoslav\gta-orange\client\Launcher.exe" --inject --timeout 600
+[2026-09-08 13:15:07] mode: inject into a running GTA5.exe (--inject), wait for unpack: yes, timeout: 600s, update check: yes
+[2026-09-08 13:15:07] update check: channel nightly, repository SashaGoncharov19/GTA-Orange-Reloaded
+[2026-09-08 13:15:07] updater: channel nightly, manifest https://github.com/SashaGoncharov19/GTA-Orange-Reloaded/releases/download/nightly/client-manifest.txt
+[2026-09-08 13:15:07] updater: local version nightly-20260908-f1adfa4, remote version nightly-20260908-39cf597
+[2026-09-08 13:15:08] updater: downloading orange-core.dll
+[2026-09-08 13:15:08] updater: downloading Launcher.exe
+[2026-09-08 13:15:09] updater: installed orange-core.dll
+[2026-09-08 13:15:09] updater: installed Launcher.exe
+[2026-09-08 13:15:09] updater: updated to version nightly-20260908-39cf597 (restart required)
+[2026-09-08 13:15:09] updater: launcher updated, restart required
+[2026-09-08 13:15:09] restarting after self-update
+[2026-09-08 13:15:09] ---- GTA:Orange Launcher nightly-20260908-39cf597 started ----
+[2026-09-08 13:15:09] ---- Launcher nightly-20260908-39cf597 starting ----
+[2026-09-08 13:15:09] launcher folder: Z:\home\sviatoslav\gta-orange\client
+[2026-09-08 13:15:09] command line: "Z:\home\sviatoslav\gta-orange\client\Launcher.exe" --inject --timeout 600 --updated
+[2026-09-08 13:15:09] mode: inject into a running GTA5.exe (--inject), wait for unpack: yes, timeout: 600s, update check: no
+[2026-09-08 13:15:09] update check: skipped (just restarted after a self-update)
+[2026-09-08 13:15:09] library to inject: Z:\home\sviatoslav\gta-orange\client\orange-core.dll
+[2026-09-08 13:15:09] waiting for GTA5.exe (up to 600s)
+[2026-09-08 13:15:09] GTA5.exe is running, pid 1848
+[2026-09-08 13:15:10] inject: GTA5.exe pid 1848
+[2026-09-08 13:15:10] inject: waiting for the executable to be unpacked (up to 120s)
+[2026-09-08 13:34:03] ---- GTA:Orange Launcher nightly-20260908-f0f3058 started ----
+[2026-09-08 13:34:03] ---- Launcher nightly-20260908-f0f3058 starting ----
+[2026-09-08 13:34:03] launcher folder: Z:\home\sviatoslav\gta-orange\client
+[2026-09-08 13:34:03] command line: "Z:\home\sviatoslav\gta-orange\client\Launcher.exe" --inject --timeout 600
+[2026-09-08 13:34:03] mode: inject into a running GTA5.exe (--inject), wait for unpack: yes, timeout: 600s, update check: yes
+[2026-09-08 13:34:03] update check: channel nightly, repository SashaGoncharov19/GTA-Orange-Reloaded
+[2026-09-08 13:34:03] updater: channel nightly, manifest https://github.com/SashaGoncharov19/GTA-Orange-Reloaded/releases/download/nightly/client-manifest.txt
+[2026-09-08 13:34:04] updater: local version nightly-20260908-f0f3058, remote version nightly-20260908-f0f3058
+[2026-09-08 13:34:04] updater: up to date
+[2026-09-08 13:34:04] updater: client is up to date
+[2026-09-08 13:34:04] library to inject: Z:\home\sviatoslav\gta-orange\client\orange-core.dll
+[2026-09-08 13:34:04] waiting for GTA5.exe (up to 600s)
+[2026-09-08 13:34:04] GTA5.exe is running, pid 1848
+[2026-09-08 13:34:04] inject: GTA5.exe pid 1848
+[2026-09-08 13:34:04] inject: waiting for the executable to be unpacked (up to 120s)
+[2026-09-08 13:34:04] unpack wait: GTA5.exe module found, image S:\steamapps\common\Grand Theft Auto V\GTA5.exe
+[2026-09-08 13:34:04] unpack wait: cannot compare with the file on disk, waiting for the code section to change in memory
+[2026-09-08 13:34:19] unpack wait: still waiting for the code section to change (15s)
+[2026-09-08 13:34:34] unpack wait: still waiting for the code section to change (30s)
+[2026-09-08 13:34:49] unpack wait: still waiting for the code section to change (45s)
+[2026-09-08 13:35:04] unpack wait: still waiting for the code section to change (60s)
+[2026-09-08 13:35:19] unpack wait: still waiting for the code section to change (75s)
+[2026-09-08 13:35:34] unpack wait: still waiting for the code section to change (90s)
+[2026-09-08 13:35:49] unpack wait: still waiting for the code section to change (105s)
+[2026-09-08 13:36:04] unpack wait: code section did not change within the timeout
+[2026-09-08 13:36:04] inject: unpack wait timed out or the process could not be read, injecting anyway
+[2026-09-08 13:36:04] inject: loading Z:\home\sviatoslav\gta-orange\client\orange-core.dll
+[2026-09-08 13:38:35] inject: LoadLibrary returned 0xE4630000 (module handle, truncated to 32 bits)
+[2026-09-08 13:38:35] inject: Z:\home\sviatoslav\gta-orange\client\orange-core.dll loaded
+[2026-09-08 13:38:35] done: orange-core.dll injected, see client.log for what happens inside the game

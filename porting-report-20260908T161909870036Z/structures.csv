@@ -1,0 +1,165 @@
+file,line,declaration,reference_offset_comment,current_offset,status
+Core/scrThread.h,13,uint32_t					m_iThreadId;,0x0000,,reference comment only; current layout unknown
+Core/scrThread.h,14,uint32_t					m_iScriptHash;,0x0004,,reference comment only; current layout unknown
+Core/scrThread.h,15,eThreadState				m_State;,0x0008,,reference comment only; current layout unknown
+Core/scrThread.h,16,uint32_t					m_iIP;,0x000C,,reference comment only; current layout unknown
+Core/scrThread.h,17,uint32_t					m_iFrameSP;,0x0010,,reference comment only; current layout unknown
+Core/scrThread.h,18,uint32_t					m_iSP;,0x0014,,reference comment only; current layout unknown
+Core/scrThread.h,19,uint32_t					m_iTimerA;,0x0018,,reference comment only; current layout unknown
+Core/scrThread.h,20,uint32_t					m_iTimerB;,0x001C,,reference comment only; current layout unknown
+Core/scrThread.h,21,uint32_t					m_iTimerC;,0x0020,,reference comment only; current layout unknown
+Core/scrThread.h,22,uint32_t					m_iUnk1;,0x0024,,reference comment only; current layout unknown
+Core/scrThread.h,23,uint32_t					m_iUnk2;,0x0028,,reference comment only; current layout unknown
+Core/scrThread.h,25,uint32_t					m_iSet1;,0x0060,,reference comment only; current layout unknown
+Core/scrThread.h,32,scrThreadContext			m_Context;,0x0008,,reference comment only; current layout unknown
+Core/scrThread.h,33,__int64						m_pStack;,0x00B0,,reference comment only; current layout unknown
+Core/scrThread.h,35,char *						m_pszExitMessage;,0x00C8,,reference comment only; current layout unknown
+Core/scrThread.h,53,void *						m_pScriptHandler;,0x0110,,reference comment only; current layout unknown
+Core/scrThread.h,55,uint8_t						m_bFlag1;,0x0140,,reference comment only; current layout unknown
+Core/scrThread.h,56,uint8_t						m_bNetworkFlag;,0x0141,,reference comment only; current layout unknown
+GTA/CRage.h,92,char pad_0x0000[0x24C];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,93,_D3DMATRIX ViewPort;,0x024C,,reference comment only; current layout unknown
+GTA/CRage.h,94,char pad_0x028C[0x1C4];,0x028C,,reference comment only; current layout unknown
+GTA/CRage.h,95,__int32 Width;,0x0450,,reference comment only; current layout unknown
+GTA/CRage.h,96,__int32 Height;,0x0454,,reference comment only; current layout unknown
+GTA/CRage.h,111,CWorld* CWorldPtr;,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,112,grcRenderTargetDX11* grcRenderTargetDX11Ptr;,0x0008,,reference comment only; current layout unknown
+GTA/CRage.h,113,char pad_0x0010[0x8];,0x0010,,reference comment only; current layout unknown
+GTA/CRage.h,114,CPedModelInfo* CPedModelInfoPtr;,0x0018,,reference comment only; current layout unknown
+GTA/CRage.h,115,char pad_0x0020[0x8];,0x0020,,reference comment only; current layout unknown
+GTA/CRage.h,116,grcTextureDX11* grcTextureDX11Ptr;,0x0028,,reference comment only; current layout unknown
+GTA/CRage.h,124,CPed * CPedPtr;,0x0008,,reference comment only; current layout unknown
+GTA/CRage.h,145,char pad_0x0008[0x18];,0x0008,,reference comment only; current layout unknown
+GTA/CRage.h,146,CPedModelInfo* PedModelInfo;,0x0020,,reference comment only; current layout unknown
+GTA/CRage.h,147,char pad_0x0028[0x8];,0x0028,,reference comment only; current layout unknown
+GTA/CRage.h,148,phInstGta* phInstGtaPtr;,0x0030,,reference comment only; current layout unknown
+GTA/CRage.h,149,char pad_0x0038[0x10];,0x0038,,reference comment only; current layout unknown
+GTA/CRage.h,150,CPedDrawHandler* CPedDrawHandlerPtr;,0x0048,,reference comment only; current layout unknown
+GTA/CRage.h,151,char pad_0x0050[0x40];,0x0050,,reference comment only; current layout unknown
+GTA/CRage.h,152,CVector3 Position;,0x0090,,reference comment only; current layout unknown
+GTA/CRage.h,153,char pad_0x009C[0x74];,0x009C,,reference comment only; current layout unknown
+GTA/CRage.h,154,CVector3 Position2;,0x0110,,reference comment only; current layout unknown
+GTA/CRage.h,155,char pad_0x011C[0x4];,0x011C,,reference comment only; current layout unknown
+GTA/CRage.h,156,CVector3 Position3;,0x0120,,reference comment only; current layout unknown
+GTA/CRage.h,157,char pad_0x012C[0x4];,0x012C,,reference comment only; current layout unknown
+GTA/CRage.h,158,float Height;,0x0130,,reference comment only; current layout unknown
+GTA/CRage.h,159,char pad_0x0134[0x2C];,0x0134,,reference comment only; current layout unknown
+GTA/CRage.h,160,CVector3 Position4;,0x0160,,reference comment only; current layout unknown
+GTA/CRage.h,161,char pad_0x016C[0x114];,0x016C,,reference comment only; current layout unknown
+GTA/CRage.h,162,float Health;,0x0280,,reference comment only; current layout unknown
+GTA/CRage.h,164,float MaxHealth;,0x0284,,reference comment only; current layout unknown
+GTA/CRage.h,165,char pad_0x0284[0xE4];,0x0284,,reference comment only; current layout unknown
+GTA/CRage.h,166,float float_1;,0x0368,,reference comment only; current layout unknown
+GTA/CRage.h,167,float float_2;,0x036C,,reference comment only; current layout unknown
+GTA/CRage.h,168,float float_3;,0x0370,,reference comment only; current layout unknown
+GTA/CRage.h,169,float float_4;,0x0374,,reference comment only; current layout unknown
+GTA/CRage.h,170,char pad_0x0378[0x1DC];,0x0378,,reference comment only; current layout unknown
+GTA/CRage.h,171,float float_5;,0x0554,,reference comment only; current layout unknown
+GTA/CRage.h,172,char pad_0x0558[0x20];,0x0558,,reference comment only; current layout unknown
+GTA/CRage.h,173,float MoveSpeed;,0x0578,,reference comment only; current layout unknown
+GTA/CRage.h,174,float MoveSpeed2;,0x0578,,reference comment only; current layout unknown
+GTA/CRage.h,175,float MoveSpeed3;,0x0578,,reference comment only; current layout unknown
+GTA/CRage.h,176,float MoveSpeed4;,0x0578,,reference comment only; current layout unknown
+GTA/CRage.h,177,float WalkSpeed;,0x0588,,reference comment only; current layout unknown
+GTA/CRage.h,178,char pad_0x058C[0x614];,0x058C,,reference comment only; current layout unknown
+GTA/CRage.h,179,CBuilding* CBuildingPtr;,0x0BA0,,reference comment only; current layout unknown
+GTA/CRage.h,180,char pad_0x0BA8[0x4D8];,0x0BA8,,reference comment only; current layout unknown
+GTA/CRage.h,181,Tasks* TasksPtr;,0x1080,,reference comment only; current layout unknown
+GTA/CRage.h,182,CPlayerInfo* CPlayerInfoPtr;,0x1088,,reference comment only; current layout unknown
+GTA/CRage.h,183,CPedInventory* CPedInventoryPtr;,0x1090,,reference comment only; current layout unknown
+GTA/CRage.h,184,CPedWeaponManager* CPedWeaponManagerPtr;,0x1098,,reference comment only; current layout unknown
+GTA/CRage.h,185,char pad_0x10A0[0x2A0];,0x10A0,,reference comment only; current layout unknown
+GTA/CRage.h,186,CPedClothCollision* CPedClothCollisionPtr;,0x1340,,reference comment only; current layout unknown
+GTA/CRage.h,187,char pad_0x1348[0x78];,0x1348,,reference comment only; current layout unknown
+GTA/CRage.h,188,int32_t Flags;,0x13C0,,reference comment only; current layout unknown
+GTA/CRage.h,189,char pad_0x13C4[0xD4];,0x13C8,,reference comment only; current layout unknown
+GTA/CRage.h,190,GTA::CVehicle* pedVehicle;,0x1498,,reference comment only; current layout unknown
+GTA/CRage.h,191,char pad_0x14A0[0x450];,0x14A0,,reference comment only; current layout unknown
+GTA/CRage.h,200,char pad_0x0000[0x8];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,207,char pad_0x0000[0x8];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,214,char pad_0x0000[0x358];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,215,CPedTaskManager* CPedTaskManagerPtr;,0x0358,,reference comment only; current layout unknown
+GTA/CRage.h,216,CTaskTree* PrimaryTasks;,0x0360,,reference comment only; current layout unknown
+GTA/CRage.h,217,CTaskTree* SecondaryTasks;,0x0368,,reference comment only; current layout unknown
+GTA/CRage.h,218,CTaskTree* MovementTasks;,0x0370,,reference comment only; current layout unknown
+GTA/CRage.h,219,CTaskTree* MotionTasks;,0x0378,,reference comment only; current layout unknown
+GTA/CRage.h,220,char pad_0x0380[0x100];,0x0380,,reference comment only; current layout unknown
+GTA/CRage.h,228,char pad_0x0008[0x208];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,229,float TimeSinceAim;,0x0210,,reference comment only; current layout unknown
+GTA/CRage.h,230,__int32 AimState;,0x0214,,reference comment only; current layout unknown
+GTA/CRage.h,231,__int32 CurrentWeaponHash;,0x0218,,reference comment only; current layout unknown
+GTA/CRage.h,232,char pad_0x021C[0x44];,0x021C,,reference comment only; current layout unknown
+GTA/CRage.h,233,CVector3 AimPosition;,0x0260,,reference comment only; current layout unknown
+GTA/CRage.h,234,float AimLength;,0x026C,,reference comment only; current layout unknown
+GTA/CRage.h,235,char pad_0x0270[0xA0];,0x0270,,reference comment only; current layout unknown
+GTA/CRage.h,236,CEntity_* TargetEntity;,0x0310,,reference comment only; current layout unknown
+GTA/CRage.h,237,char pad_0x0318[0x2B0];,0x0318,,reference comment only; current layout unknown
+GTA/CRage.h,244,char pad_0x0000[0x8];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,285,char pad_0x0000[0x8];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,292,char pad_0x0000[0x8];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,299,char pad_0x0000[0x48];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,306,CPedWeaponManager_* CPedWeaponManagerMethods;,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,307,char pad_0x0008[0x80];,0x0008,,reference comment only; current layout unknown
+GTA/CRage.h,308,CWeapon* CWeaponPtr;,0x0088,,reference comment only; current layout unknown
+GTA/CRage.h,309,char pad_0x0090[0x78];,0x0090,,reference comment only; current layout unknown
+GTA/CRage.h,324,char pad_0x0020[0xA8];,0x0020,,reference comment only; current layout unknown
+GTA/CRage.h,331,char pad_0x0020[0xA8];,0x0020,,reference comment only; current layout unknown
+GTA/CRage.h,338,char pad_0x0000[0x8];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,345,char pad_0x0000[0x8];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,352,CTaskTreeMovement_* CTaskTreeMovementMethods;,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,358,char pad_0x0000[0x8];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,365,"virtual __int64 *func_1(__int64 a1, char a2) = 0;",0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,366,"virtual bool *func_2(__int64 a1, int a2) = 0;",0x0008,,reference comment only; current layout unknown
+GTA/CRage.h,367,char pad_0x0010[0x18];,0x0010,,reference comment only; current layout unknown
+GTA/CRage.h,374,"__int64 (*func_1)(__int64 a1, char a2);",0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,375,"int (*func_2)(__int64 a1, unsigned int a2);",0x0008,,reference comment only; current layout unknown
+GTA/CRage.h,376,"int (*func_3)(__int64 a1, int a2, __int64 a3);",0x0010,,reference comment only; current layout unknown
+GTA/CRage.h,377,int (*func_4)(__int64 a1);,0x0018,,reference comment only; current layout unknown
+GTA/CRage.h,384,char pad_0x0000[0x8];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,391,"__int64 * (*func_1)(__int64 *a1, char a2);",0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,397,CWeaponMethods_* CWeaponMethods;,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,398,char pad_0x0008[0x10];,0x0008,,reference comment only; current layout unknown
+GTA/CRage.h,405,"__int64(*Equip)(__int64 a1, char a2);",0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,406,"char(*Shoot)(__int64 a1, CPed *a2, __int64 a3);",0x0008,,reference comment only; current layout unknown
+GTA/CRage.h,412,"__int64(*func_1)(CPedFactory* pedFactory, bool a2);",0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,413,"__int64(*Create)(CPedFactory* pedFactory, unsigned char *a2, int *a3, __int64 a4, bool a5, bool networkEntity, bool a7);",0x0008,,reference comment only; current layout unknown
+GTA/CRage.h,414,"__int64(*func_3)(CPedFactory* *pedFactory, __int64 a2, int *a3, __int64 a4, int a5, bool a6);",0x0010,,reference comment only; current layout unknown
+GTA/CRage.h,415,"__int64(*func_4)(CPedFactory* pedFactory, __int64 a2, __int64 a3, bool a4, bool a5);",0x0018,,reference comment only; current layout unknown
+GTA/CRage.h,416,"void(*func_5)(CPedFactory* pedFactory, __int64 a2, __int64 a3, bool a4);",0x0020,,reference comment only; current layout unknown
+GTA/CRage.h,417,"__int64(*func_6)(CPedFactory* pedFactory, unsigned char *a2, __int64 a3, __int64 a4, __int64 a5);",0x0028,,reference comment only; current layout unknown
+GTA/CRage.h,418,"int(*func_7)(CPedFactory* pedFactory, __int64 a2);",0x0030,,reference comment only; current layout unknown
+GTA/CRage.h,446,"virtual int64_t func_3(__int64 a2, __int64 a3, __int64 a4, float a5, unsigned int a6, unsigned int a7, bool a8);",0x0010,,reference comment only; current layout unknown
+GTA/CRage.h,447,"virtual int func_4(__int64 a2, unsigned int a3, unsigned int a4, unsigned int a5, __int64 *a6);",0x0018,,reference comment only; current layout unknown
+GTA/CRage.h,448,"virtual char func_5(__int64 a2, unsigned int a3, unsigned int a4, unsigned int a5, WORD *a6);",0x0020,,reference comment only; current layout unknown
+GTA/CRage.h,493,char pad_0x0000[0x7B8];,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,494,CTaskTree* PrimaryTasks;,0x07B8,,reference comment only; current layout unknown
+GTA/CRage.h,495,CTaskTree* SecondaryTasks;,0x07C0,,reference comment only; current layout unknown
+GTA/CRage.h,512,char pad_0x0008[0x18];,0x0008,,reference comment only; current layout unknown
+GTA/CRage.h,513,CVehicleModelInfo* VehicleModelInfo;,0x0020,,reference comment only; current layout unknown
+GTA/CRage.h,514,char pad_0x0028[0x68];,0x0028,,reference comment only; current layout unknown
+GTA/CRage.h,515,Vector3 Position;,0x0090,,reference comment only; current layout unknown
+GTA/CRage.h,516,char pad_0x009C[0x9F4];,0x009C,,reference comment only; current layout unknown
+GTA/CRage.h,517,CVehicleIntelligence* VehicleIntelligence;,0x0A90,,reference comment only; current layout unknown
+GTA/CRage.h,518,char pad_0x0A98[0xC28];,0x0A98,,reference comment only; current layout unknown
+GTA/CRage.h,527,char pad_0x0028[0x68];,0x0028,,reference comment only; current layout unknown
+GTA/CRage.h,528,CVector3 Position;,0x0090,,reference comment only; current layout unknown
+GTA/CRage.h,638,unsigned char *Buffer;,0x0000,,reference comment only; current layout unknown
+GTA/CRage.h,639,DWORD Align;,0x0008,,reference comment only; current layout unknown
+GTA/CRage.h,640,DWORD StartSize;,0x000C,,reference comment only; current layout unknown
+GTA/CRage.h,641,DWORD FinalSize;,0x0010,,reference comment only; current layout unknown
+GTA/CRage.h,642,DWORD Size2;,0x0014,,reference comment only; current layout unknown
+GTA/CRage.h,643,DWORD Unknown;,0x0018,,reference comment only; current layout unknown
+GTA/CRage.h,644,unsigned char Flags;,0x001C,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,68,char pad_0x0008[0xF8];,0x0000,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,70,,0x0118,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,77,char pad_0x0000[0x180];,0x0000,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,79,char pad_0x0198[0xB0];,0x0198,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,86,char pad_0x0000[0x8];,0x0000,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,93,char pad_0x0000[0x108];,0x0000,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,100,char pad_0x0000[0x100];,0x0000,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,101,int64_t PoolContent;,0x0100,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,102,int64_t PoolCapacity;,0x0108,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,103,int64_t PoolSize;,0x0110,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,104,char pad_0x0118[0x70];,0x0118,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,111,char pad_0x0000[0x158];,0x0000,,reference comment only; current layout unknown
+GTA/CReplayInterface.h,113,char pad_0x0170[0x58];,0x0170,,reference comment only; current layout unknown
