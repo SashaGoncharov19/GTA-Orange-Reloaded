@@ -20,7 +20,7 @@ int main()
 			"# GTA:Orange client manifest\r\n"
 			"version 0.2.0\r\n"
 			"file orange-core.dll " + std::string(kHashA) + " 123456\r\n"
-			"file Launcher.exe " + std::string(kHashB) + " 42  # trailing comment\r\n"
+			"file OrangeLauncher.exe " + std::string(kHashB) + " 42  # trailing comment\r\n"
 			"future-key something\r\n";
 		UpdateManifest m;
 		CHECK(UpdateManifest::Parse(text, m));
@@ -31,7 +31,7 @@ int main()
 			CHECK(m.files[0].name == "orange-core.dll");
 			CHECK(m.files[0].sha256 == kHashA);
 			CHECK(m.files[0].size == 123456);
-			CHECK(m.files[1].name == "Launcher.exe");
+			CHECK(m.files[1].name == "OrangeLauncher.exe");
 			CHECK(m.files[1].sha256 == "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210");
 			CHECK(m.files[1].size == 42);
 		}
@@ -40,7 +40,7 @@ int main()
 	// --- nightly ids are plain strings --------------------------------------
 	{
 		UpdateManifest m;
-		CHECK(UpdateManifest::Parse("version nightly-20260908-f15d9d3\nfile Launcher.exe " + std::string(kHashA) + " 1\n", m));
+		CHECK(UpdateManifest::Parse("version nightly-20260908-f15d9d3\nfile OrangeLauncher.exe " + std::string(kHashA) + " 1\n", m));
 		CHECK(m.version == "nightly-20260908-f15d9d3");
 	}
 

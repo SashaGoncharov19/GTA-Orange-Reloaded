@@ -68,13 +68,13 @@ void UpdateSplash(float progress)
 // ---------------------------------------------------------------------------
 // Command line options
 //
-//   Launcher.exe                      start the game and inject (default)
-//   Launcher.exe --inject             attach to an already running GTA5.exe
+//   OrangeLauncher.exe                      start the game and inject (default)
+//   OrangeLauncher.exe --inject             attach to an already running GTA5.exe
 //                                     (used on Linux/Proton, see tools/proton)
-//   Launcher.exe --game-dir <path>    GTA V folder, skips the folder dialog
-//   Launcher.exe --steam / --direct   force the way the game is started
-//   Launcher.exe --no-unpack-wait     do not wait for the exe to be unpacked
-//   Launcher.exe --timeout <seconds>  how long to wait for GTA5.exe
+//   OrangeLauncher.exe --game-dir <path>    GTA V folder, skips the folder dialog
+//   OrangeLauncher.exe --steam / --direct   force the way the game is started
+//   OrangeLauncher.exe --no-unpack-wait     do not wait for the exe to be unpacked
+//   OrangeLauncher.exe --timeout <seconds>  how long to wait for GTA5.exe
 // ---------------------------------------------------------------------------
 struct LaunchOptions
 {
@@ -97,7 +97,7 @@ static void ShowUsage()
 {
 	MessageBoxW(NULL,
 		L"GTA:Orange Launcher\n\n"
-		L"Launcher.exe [options]\n\n"
+		L"OrangeLauncher.exe [options]\n\n"
 		L"  --inject            do not start the game, wait for a running GTA5.exe and inject\n"
 		L"  --game-dir <path>   GTA V installation folder (skips the folder dialog)\n"
 		L"  --steam             start the game through Steam (steam://run/271590)\n"
@@ -169,7 +169,7 @@ static bool ParseCommandLine(LaunchOptions& options)
 	return ok;
 }
 
-// Folder that contains Launcher.exe and orange-core.dll
+// Folder that contains OrangeLauncher.exe and orange-core.dll
 static std::wstring GetLauncherDir()
 {
 	wchar_t path[MAX_PATH] = { 0 };
@@ -190,7 +190,7 @@ static std::wstring FromUtf8(const char* text)
 	return out;
 }
 
-// launcher.xml next to Launcher.exe:
+// launcher.xml next to OrangeLauncher.exe:
 //   <launcher><updates enabled="true" channel="stable" repository="owner/repo"/></launcher>
 static void LoadLauncherSettings(const std::wstring& dir, UpdaterSettings& settings)
 {
@@ -215,7 +215,73 @@ static void LoadLauncherSettings(const std::wstring& dir, UpdaterSettings& setti
 		settings.repository = FromUtf8(repository);
 }
 
-// Starts a fresh copy of (the just updated) Launcher.exe with the same
+static std::wstring OwnFileName()
+{
+	wchar_t path[MAX_PATH] = { 0 };
+	GetModuleFileNameW(NULL, path, MAX_PATH);
+	std::wstring full(path);
+	size_t pos = full.find_last_of(L"\\/");
+	return pos == std::wstring::npos ? full : full.substr(pos + 1);
+}
+
+// GTA5.exe looks for the Rockstar Games Launcher by process name, and that
+// name is Launcher.exe: while a launcher of ours runs under it, the game's
+// Social Club SDK fails to initialise (error code 1005). This executable is
+// OrangeLauncher.exe for that reason. An install that still starts the old
+// name (an old gta-orange-proton.sh, a shortcut) gets the new binary through
+// the auto-updater; when that binary finds itself running as Launcher.exe it
+// starts OrangeLauncher.exe with the same arguments and exits at once, so
+// that no process of the wrong name is around while the game starts.
+static void HandOverIfOldName(const std::wstring& orangeDir)
+{
+	if (_wcsicmp(OwnFileName().c_str(), L"Launcher.exe") != 0)
+		return;
+	std::wstring target = orangeDir + L"\\OrangeLauncher.exe";
+	if (!Utils::FileExist(target))
+	{
+		LauncherLog("WARNING: running as Launcher.exe, the process name GTA5.exe expects the Rockstar Games Launcher under: the game's "
+			"Social Club may fail with error 1005 while this launcher runs. OrangeLauncher.exe is not here yet to hand over to "
+			"(the auto-updater fetches it; unpacking the current client package switches for good)");
+		return;
+	}
+	std::wstring commandLine = L"\"" + target + L"\"";
+	int argc = 0;
+	LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+	bool updated = false;
+	for (int i = 1; argv && i < argc; ++i)
+	{
+		commandLine += L" \"";
+		commandLine += argv[i];
+		commandLine += L"\"";
+		if (_wcsicmp(argv[i], L"--updated") == 0)
+			updated = true;
+	}
+	if (argv)
+		LocalFree(argv);
+	if (!updated)
+		commandLine += L" --updated";   // the update check just ran
+	std::vector<wchar_t> buffer(commandLine.begin(), commandLine.end());
+	buffer.push_back(L'\0');
+	STARTUPINFOW si;
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	PROCESS_INFORMATION pi;
+	ZeroMemory(&pi, sizeof(pi));
+	LauncherLog(L"handing over to " + target + L": this launcher was started as Launcher.exe, the name GTA5.exe reserves for the "
+		L"Rockstar Games Launcher (error 1005 while it runs); update gta-orange-proton.sh / your shortcut to OrangeLauncher.exe");
+	if (!CreateProcessW(target.c_str(), buffer.data(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+	{
+		LauncherLog("hand-over FAILED (error " + std::to_string(GetLastError()) + "), continuing as Launcher.exe");
+		return;
+	}
+	CloseHandle(pi.hThread);
+	CloseHandle(pi.hProcess);
+	// Not waiting on purpose: the whole point is that no Launcher.exe exists
+	// while the game starts. gta-orange-proton.sh waits for the new process.
+	ExitProcess(0);
+}
+
+// Starts a fresh copy of (the just updated) OrangeLauncher.exe with the same
 // arguments and exits.
 static void RestartLauncher()
 {
@@ -358,6 +424,7 @@ void LaunchGame()
 		}
 		else
 			LauncherLog(g_options.afterUpdate ? "update check: skipped (just restarted after a self-update)" : "update check: skipped (--no-update)");
+		HandOverIfOldName(orangeDir);
 		SetSplashStatus(g_options.injectOnly ? L"Waiting for GTA5.exe..." : L"Starting GTA V...");
 
 		Registry::CreateRegKeyStructure(HKEY_CURRENT_USER, L"SOFTWARE\\GTA Orange Team\\GTA Orange");

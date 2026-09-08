@@ -8,17 +8,17 @@
 #      Proton prefix of the game (steamapps/compatdata/271590)
 #   2. starts GTA V through Steam (unless it is already running)
 #   3. waits for GTA5.exe to appear and then runs
-#         Launcher.exe --inject
+#         OrangeLauncher.exe --inject
 #      inside the very same Proton prefix, which injects orange-core.dll into
 #      the running game
 #   4. when the launcher exits, shows the tail of launcher.log and client.log
 #      and tells you whether orange-core activated inside the game
 #
 # Usage:
-#   ./gta-orange-proton.sh [options] [-- extra Launcher.exe options]
+#   ./gta-orange-proton.sh [options] [-- extra OrangeLauncher.exe options]
 #
 # Options:
-#   --client-dir DIR   folder with Launcher.exe + orange-core.dll
+#   --client-dir DIR   folder with OrangeLauncher.exe + orange-core.dll
 #                      (default: the folder of this script)
 #   --proton DIR       Proton installation to use (default: the one Steam
 #                      configured for GTA V, read from compatdata/config_info)
@@ -26,12 +26,12 @@
 #   --timeout SEC      how long to wait for GTA5.exe (default 600)
 #   --logs             only print the log files of the last run and exit
 #   --no-log-tail      do not print the logs after the launcher exits
-#   --inject-after SEC passed to Launcher.exe: wait for the game window and
+#   --inject-after SEC passed to OrangeLauncher.exe: wait for the game window and
 #                      SEC more seconds before injecting (default 45). The
 #                      game's Social Club SDK initialises during its first
 #                      seconds and reports "error code 1005" when disturbed;
 #                      0 injects right after the executable is unpacked.
-#   --dump-game        passed to Launcher.exe: write the unpacked GTA5.exe
+#   --dump-game        passed to OrangeLauncher.exe: write the unpacked GTA5.exe
 #                      image (for IDA / Ghidra) next to this script, no inject
 #   -h, --help         show this help
 #
@@ -48,7 +48,7 @@
 #                               launch option to get the same for GTA5.exe
 #
 # Alternative without this script (needs protontricks):
-#   protontricks-launch --appid 271590 /path/to/Launcher.exe --inject
+#   protontricks-launch --appid 271590 /path/to/OrangeLauncher.exe --inject
 
 set -euo pipefail
 
@@ -190,7 +190,7 @@ check_package_version() {
 	running="$(grep -a 'GTA:Orange Launcher .* started' "$LAUNCHER_LOG" | tail -n 1 | sed -E 's/.*GTA:Orange Launcher (.*) started.*/\1/')"
 	if [ -n "$packaged" ] && [ -n "$running" ] && [ "$packaged" != "$running" ]; then
 		log "WARNING: the launcher that ran is version '$running', but this package is '$packaged'."
-		log "         Launcher.exe / orange-core.dll next to this script are not the ones from the package"
+		log "         OrangeLauncher.exe / orange-core.dll next to this script are not the ones from the package"
 		log "         (the auto-updater replaced them, or the zip was unpacked into another folder)."
 		log "         Unpack the package over this folder with:  unzip -o -j gta-orange-client-win64.zip -d '$CLIENT_DIR'"
 	fi
@@ -205,11 +205,24 @@ if [ "$LOGS_ONLY" = 1 ]; then
 	exit 0
 fi
 
-[ -f "$CLIENT_DIR/Launcher.exe" ] || die "Launcher.exe not found in '$CLIENT_DIR' (use --client-dir)"
+# GTA5.exe looks for the Rockstar Games Launcher by process name, and that
+# name is Launcher.exe: with a launcher of ours running under it the game's
+# Social Club fails to initialise (error code 1005). Hence OrangeLauncher.exe.
+LAUNCHER_EXE="$CLIENT_DIR/OrangeLauncher.exe"
+if [ ! -f "$LAUNCHER_EXE" ]; then
+	if [ -f "$CLIENT_DIR/Launcher.exe" ]; then
+		LAUNCHER_EXE="$CLIENT_DIR/Launcher.exe"
+		log "WARNING: only the old Launcher.exe is here. GTA5.exe mistakes a process of that name for the Rockstar"
+		log "         Games Launcher and fails with error 1005. It will try to hand over to OrangeLauncher.exe once"
+		log "         the auto-updater has fetched it; unpacking the current client package fixes it for good."
+	else
+		die "OrangeLauncher.exe not found in '$CLIENT_DIR' (use --client-dir)"
+	fi
+fi
 [ -f "$CLIENT_DIR/orange-core.dll" ] || die "orange-core.dll not found in '$CLIENT_DIR'"
-if [ -f "$CLIENT_DIR/client/Launcher.exe" ]; then
-	log "WARNING: $CLIENT_DIR/client/Launcher.exe exists: the zip was probably unpacked inside the client folder."
-	log "         This run uses $CLIENT_DIR/Launcher.exe. To use the freshly unpacked files instead:"
+if [ -f "$CLIENT_DIR/client/OrangeLauncher.exe" ] || [ -f "$CLIENT_DIR/client/Launcher.exe" ]; then
+	log "WARNING: $CLIENT_DIR/client/OrangeLauncher.exe exists: the zip was probably unpacked inside the client folder."
+	log "         This run uses $CLIENT_DIR/OrangeLauncher.exe. To use the freshly unpacked files instead:"
 	log "         unzip -o -j gta-orange-client-win64.zip -d '$CLIENT_DIR' && rm -r '$CLIENT_DIR/client'"
 fi
 
@@ -268,13 +281,13 @@ find_game_exe() {
 
 # orange-core translates every native it calls to the hash the running build
 # registers, through natives-<game version>.txt next to orange-core.dll.
-# Launcher.exe downloads that table itself, but only when it can read the game
+# OrangeLauncher.exe downloads that table itself, but only when it can read the game
 # version, which needs the game file - so generate it here, where GTA5.exe is
 # a plain Linux path. Never fatal: without it orange-core still loads and says
 # what is missing.
 ensure_natives_crossmap() {
 	local exe tool candidate
-	exe="$(find_game_exe)" || { log "Natives crossmap: GTA5.exe not found in any Steam library, leaving it to Launcher.exe"; return 0; }
+	exe="$(find_game_exe)" || { log "Natives crossmap: GTA5.exe not found in any Steam library, leaving it to OrangeLauncher.exe"; return 0; }
 	tool=""
 	for candidate in "$CLIENT_DIR/crossmap_from_fivem.py" \
 	                 "$(dirname "${BASH_SOURCE[0]}")/../natives/crossmap_from_fivem.py"; do
@@ -284,11 +297,11 @@ ensure_natives_crossmap() {
 		fi
 	done
 	if [ -z "$tool" ]; then
-		log "Natives crossmap: crossmap_from_fivem.py not found next to this script, leaving it to Launcher.exe"
+		log "Natives crossmap: crossmap_from_fivem.py not found next to this script, leaving it to OrangeLauncher.exe"
 		return 0
 	fi
 	if ! command -v python3 >/dev/null 2>&1; then
-		log "Natives crossmap: python3 not installed, leaving it to Launcher.exe"
+		log "Natives crossmap: python3 not installed, leaving it to OrangeLauncher.exe"
 		return 0
 	fi
 	log "Natives crossmap: checking (game: $exe)"
@@ -300,7 +313,7 @@ ensure_natives_crossmap() {
 	while IFS= read -r line; do
 		[ -n "$line" ] && log "  $line"
 	done <<< "$output"
-	[ "$status" -eq 0 ] || log "Natives crossmap: generation failed (no internet?), leaving it to Launcher.exe"
+	[ "$status" -eq 0 ] || log "Natives crossmap: generation failed (no internet?), leaving it to OrangeLauncher.exe"
 	return 0
 }
 COMPAT_DATA="$(find_compatdata)" || die "Proton prefix for app $APPID not found. Start GTA V once through Steam (with Proton enabled) and try again."
@@ -350,7 +363,7 @@ export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_ROOT"
 export STEAM_COMPAT_DATA_PATH="$COMPAT_DATA"
 cd "$CLIENT_DIR"
 set +e
-"$PROTON_DIR/proton" run "$CLIENT_DIR/Launcher.exe" --inject --timeout "$TIMEOUT" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+"$PROTON_DIR/proton" run "$LAUNCHER_EXE" --inject --timeout "$TIMEOUT" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
 status=$?
 set -e
 
@@ -364,9 +377,9 @@ while pgrep -f 'Launcher\.exe.*--inject' >/dev/null 2>&1 && [ "$waited" -lt 300 
 done
 
 if [ "$status" -eq 0 ]; then
-	log "Launcher.exe finished (exit code 0)"
+	log "OrangeLauncher.exe finished (exit code 0)"
 else
-	log "Launcher.exe exited with code $status"
+	log "OrangeLauncher.exe exited with code $status"
 fi
 
 if [ "$LOG_TAIL" = 1 ]; then

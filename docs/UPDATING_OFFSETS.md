@@ -103,7 +103,7 @@ in clear inside the running process. The launcher writes such a dump for you:
 
 ```bash
 ./gta-orange-proton.sh --dump-game        # Linux / Proton
-Launcher.exe --inject --dump-game         # Windows, game already running
+OrangeLauncher.exe --inject --dump-game         # Windows, game already running
 ```
 
 It produces `GTA5-<version>.dump.exe` next to the launcher with the section

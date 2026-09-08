@@ -451,7 +451,7 @@ void OnGameReady()
 	else
 	{
 		log_error << "Scripts not started: no natives crossmap for game version " << GameOffsets::GameVersion()
-			<< " (natives-" << GameOffsets::GameVersion() << ".txt next to orange-core.dll). Start the game through Launcher.exe with "
+			<< " (natives-" << GameOffsets::GameVersion() << ".txt next to orange-core.dll). Start the game through OrangeLauncher.exe with "
 			"internet access once, or run tools/natives/crossmap_from_fivem.py; see docs/PORTING_STATUS.md" << std::endl;
 		CChat::Get()->AddChatMessage("{FF8F00}GTA:Orange{FFFFFF}: no natives crossmap for game version " + GameOffsets::GameVersion()
 			+ " (natives-" + GameOffsets::GameVersion() + ".txt is missing next to orange-core.dll), scripts are not started. See client.log.");

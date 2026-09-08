@@ -146,7 +146,7 @@ bool Injector::InjectAll(bool waitForUnpack, int unpackTimeoutSeconds)
 		if (!loaded)
 		{
 			LauncherLog("inject: FAILED: " + error);
-			std::string message = "Failed to inject " + lib + "\n" + error + "\n\nSee launcher.log and client.log next to Launcher.exe.";
+			std::string message = "Failed to inject " + lib + "\n" + error + "\n\nSee launcher.log and client.log next to OrangeLauncher.exe.";
 			MessageBoxA(NULL, message.c_str(), "GTA:Orange Launcher", MB_OK | MB_ICONERROR);
 			return false;
 		}

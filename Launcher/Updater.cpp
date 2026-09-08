@@ -283,7 +283,7 @@ UpdateResult Updater::Run()
 	if (IsNightlyVersion(m_localVersion) != IsNightlyVersion(manifest.version) && !m_settings.force && !m_settings.channelExplicit)
 	{
 		LauncherLog("updater: " + manifest.version + " belongs to a different channel than this build (" + m_localVersion
-			+ "), not switching automatically; run Launcher.exe --channel " + Narrow(m_settings.channel) + " --update to switch");
+			+ "), not switching automatically; run OrangeLauncher.exe --channel " + Narrow(m_settings.channel) + " --update to switch");
 		return UpdateResult::Skipped;
 	}
 

@@ -1,7 +1,7 @@
 # GTA V 1.0.3889.0: what was found in the dump
 
 Written 2026-09-08 from the memory dump `GTA5-1.0.3889.0.dump.exe`
-(65,387,520 bytes, produced by `Launcher.exe --dump-game`, section table fixed
+(65,387,520 bytes, produced by `OrangeLauncher.exe --dump-game`, section table fixed
 so that file offsets equal RVAs) plus the agent report on branch
 `porting-report-3889`. Every value below is an RVA (address minus the image
 base `0x140000000`), verified with `objdump` and the `.pdata` function table

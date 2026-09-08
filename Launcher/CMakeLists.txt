@@ -22,7 +22,7 @@ target_compile_definitions(Launcher PRIVATE _WINDOWS UNICODE _UNICODE
 target_link_libraries(Launcher PRIVATE tinyxml2 gdiplus shell32 ole32 user32 gdi32 advapi32 psapi shlwapi winhttp bcrypt version)
 
 set_target_properties(Launcher PROPERTIES
-  OUTPUT_NAME "Launcher"
+  OUTPUT_NAME "OrangeLauncher"
   RUNTIME_OUTPUT_DIRECTORY "${ORANGE_CLIENT_OUTPUT_DIR}"
   FOLDER "client")
 

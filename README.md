@@ -16,7 +16,7 @@ used with the Steam/Proton version of the game on Linux.
 | `orange_server` | `Server/` | Linux, Windows | dedicated server (RakNet networking, built-in HTTP server, YAML config) |
 | `lua-module` | `lua-module/` | Linux, Windows | LuaJIT scripting for the server (resources under `resources/`) |
 | `simple-module` | `simple-module/` | Linux, Windows | minimal example of a native (C++) server module |
-| `Launcher.exe` | `Launcher/` | Windows (+Proton) | starts GTA V / attaches to it and injects the client core |
+| `OrangeLauncher.exe` | `Launcher/` | Windows (+Proton) | starts GTA V / attaches to it and injects the client core |
 | `orange-core.dll` | `orange-core/` | Windows (+Proton) | the client: game hooks, networking, chat/UI (ImGui), client-side Lua |
 | `font-converter`, `luajit` | `font-converter/`, `deps/` | all | helper tools |
 
@@ -31,8 +31,8 @@ tags `v*` create versioned releases. Each release contains:
 
 * `gta-orange-server-linux-x64.tar.gz` - dedicated server for Linux (glibc >= 2.35)
 * `gta-orange-server-win64.zip` - dedicated server for Windows
-* `gta-orange-client-win64.zip` - `Launcher.exe` + `orange-core.dll` + the Proton helper script
-* `client-manifest.txt`, `orange-core.dll`, `Launcher.exe`, `server-version.txt` - consumed by the auto-updater
+* `gta-orange-client-win64.zip` - `OrangeLauncher.exe` + `orange-core.dll` + the Proton helper script
+* `client-manifest.txt`, `orange-core.dll`, `OrangeLauncher.exe`, `server-version.txt` - consumed by the auto-updater
 
 The same files are attached as artifacts to every CI run (Actions tab), and
 the server is published as a Docker image:
@@ -65,8 +65,8 @@ Server events, commands and the whole API exposed to Lua are listed in
 ### Client
 
 * **Windows:** unzip `gta-orange-client-win64.zip` anywhere and run
-  `Launcher.exe`. It asks for the GTA V folder once, starts the game and
-  injects `orange-core.dll`. `Launcher.exe --help` lists the options
+  `OrangeLauncher.exe`. It asks for the GTA V folder once, starts the game and
+  injects `orange-core.dll`. `OrangeLauncher.exe --help` lists the options
   (`--inject`, `--game-dir`, `--steam`, `--direct`, `--timeout`, ...).
 * **Linux (Steam + Proton):** run `gta-orange-proton.sh` from the client
   folder. It starts GTA V through Steam and injects the client inside the
@@ -82,15 +82,15 @@ browser.
 
 Nothing has to be downloaded by hand after the first install:
 
-* **Client:** every time `Launcher.exe` starts it fetches
+* **Client:** (until 2026-09-08 the executable was `Launcher.exe`; GTA V looks for the Rockstar Games Launcher by that process name, so it was renamed - an old install updates itself and hands over to the new name) every time `OrangeLauncher.exe` starts it fetches
   `client-manifest.txt` from the GitHub releases (`stable` channel = latest
   release, `nightly` = latest `master` build), compares SHA-256 hashes with the
-  local `orange-core.dll` / `Launcher.exe`, downloads what changed, verifies it
+  local `orange-core.dll` / `OrangeLauncher.exe`, downloads what changed, verifies it
   and swaps the files in place (the launcher replaces itself and restarts).
   A build follows the channel it came from (a nightly client tracks the
   `nightly` pre-release, a release tracks the stable releases) and never
   switches channels on its own; to move an installation run
-  `Launcher.exe --channel nightly --update` (or `--channel stable --update`)
+  `OrangeLauncher.exe --channel nightly --update` (or `--channel stable --update`)
   once. Configure it in `launcher.xml` next to the launcher or with
   `--no-update`, `--update`, `--channel <name>`. Everything is logged to
   `launcher.log`. A failed update check never blocks the game start.
@@ -109,7 +109,7 @@ Nothing has to be downloaded by hand after the first install:
 > a fallback. On a build where a required entry does not resolve the DLL
 > stays inactive instead of crashing the game and writes
 > `offsets-<version>.generated.ini` next to itself. Natives are translated
-> through `natives-<version>.txt`, which `Launcher.exe` generates from FiveM's
+> through `natives-<version>.txt`, which `OrangeLauncher.exe` generates from FiveM's
 > public crossmap on first start. See [docs/PORTING_STATUS.md](docs/PORTING_STATUS.md)
 > and [docs/UPDATING_OFFSETS.md](docs/UPDATING_OFFSETS.md).
 
@@ -139,7 +139,7 @@ after every build. Useful options:
 | Option | Default | Meaning |
 |--------|---------|---------|
 | `ORANGE_BUILD_SERVER` | `ON` | build `orange_server` and the server modules |
-| `ORANGE_BUILD_CLIENT` | `ON` on MSVC, `OFF` elsewhere | build `Launcher.exe` and `orange-core.dll` |
+| `ORANGE_BUILD_CLIENT` | `ON` on MSVC, `OFF` elsewhere | build `OrangeLauncher.exe` and `orange-core.dll` |
 | `ORANGE_BUILD_TOOLS` | `ON` | build `font-converter` and the `luajit` interpreter |
 | `ORANGE_LUA_MYSQL` | `ON` | link lua-module against MySQL/MariaDB client if found (else `_LUA_NOSQL`) |
 | `ORANGE_ENABLE_SCALEFORM` | `OFF` | compile the experimental Scaleform DrawText code (needs the proprietary GFx SDK libraries) |
@@ -160,7 +160,7 @@ creates releases for `v*` tags and pushes the server Docker image to GHCR.
 
 Every release also carries the files the auto-updater consumes:
 `client-manifest.txt` (version + SHA-256 of each client file), the raw
-`orange-core.dll` and `Launcher.exe`, and `server-version.txt`. The version
+`orange-core.dll` and `OrangeLauncher.exe`, and `server-version.txt`. The version
 string embedded in the binaries is the tag (`0.2.0`) for releases and
 `nightly-YYYYMMDD-<sha>` for master builds (`-DORANGE_VERSION_STRING=...`).
 
@@ -174,7 +174,7 @@ and what is still missing (structure layouts) are in
 [docs/PORTING_STATUS.md](docs/PORTING_STATUS.md); the addresses and
 structures found in the game dump are in
 [docs/FINDINGS_1.0.3889.0.md](docs/FINDINGS_1.0.3889.0.md).
-`Launcher.exe --dump-game` writes the unpacked game image for a disassembler.
+`OrangeLauncher.exe --dump-game` writes the unpacked game image for a disassembler.
 
 ## Known limitations
 
@@ -205,7 +205,7 @@ structures found in the game dump are in
   when stdin is closed (Docker/systemd).
 * Client: the developer HWID whitelist that refused to load the DLL on any
   other machine was removed; a game build signature check was added;
-  `Launcher.exe` got command line options, timeouts and error messages
+  `OrangeLauncher.exe` got command line options, timeouts and error messages
   instead of busy loops.
 * Repository: committed build artefacts (CMake caches, object files,
   prebuilt libraries, Code::Blocks files) were removed.

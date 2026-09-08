@@ -14,7 +14,7 @@ if(WIN32 AND MSVC)
 else()
   set(_orange_client_default OFF)
 endif()
-option(ORANGE_BUILD_CLIENT "Build the game client: Launcher.exe + orange-core.dll (Windows / MSVC only)" ${_orange_client_default})
+option(ORANGE_BUILD_CLIENT "Build the game client: OrangeLauncher.exe + orange-core.dll (Windows / MSVC only)" ${_orange_client_default})
 option(ORANGE_BUILD_TOOLS "Build helper tools (font-converter, luajit interpreter)" ON)
 option(ORANGE_LUA_MYSQL "Enable MySQL support in lua-module when a MySQL/MariaDB client library is found" ON)
 option(ORANGE_ENABLE_SCALEFORM "Compile the experimental Scaleform DrawText code into orange-core (needs the proprietary GFx SDK libraries)" OFF)
@@ -27,7 +27,7 @@ set(ORANGE_VERSION_STRING "${PROJECT_VERSION}-dev" CACHE STRING "Version string 
 file(WRITE "${CMAKE_BINARY_DIR}/version.txt" "${ORANGE_VERSION_STRING}\n")
 
 if(ORANGE_BUILD_CLIENT AND NOT (WIN32 AND MSVC))
-  message(FATAL_ERROR "The client (orange-core.dll / Launcher.exe) can only be built with MSVC on Windows. Configure with -DORANGE_BUILD_CLIENT=OFF.")
+  message(FATAL_ERROR "The client (orange-core.dll / OrangeLauncher.exe) can only be built with MSVC on Windows. Configure with -DORANGE_BUILD_CLIENT=OFF.")
 endif()
 
 # ------------------------------------------------------------------------------
