@@ -237,7 +237,9 @@ namespace NativeTable
 		size_t count = WalkAll(table, g_obfuscated, hashes.data(), handlers.data(), capacity);
 		if (!count)
 		{
-			log_error << "Natives: the registration table walk found nothing (layout assumption wrong for this build?)" << std::endl;
+			log_error << "Natives: the registration table walk found nothing - the table at "
+				<< orange::HexString((uintptr_t)table) << " is empty. Either the game had not registered its natives yet, "
+				"or the RegistrationTable offset / the obfuscated layout is wrong for this build" << std::endl;
 			return 0;
 		}
 		uintptr_t base = (uintptr_t)GetModuleHandle(NULL);

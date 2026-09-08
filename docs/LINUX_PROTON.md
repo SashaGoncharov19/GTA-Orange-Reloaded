@@ -170,12 +170,29 @@ workflow (syntax, how to find each kind of address, what else changes between
 builds) is in [UPDATING_OFFSETS.md](UPDATING_OFFSETS.md).
 
 Natives are called by their canonical hash and translated through
-`natives-<version>.txt` next to the DLL. `Launcher.exe` generates that file
-on first start from FiveM's public universal crossmap (an HTTPS download from
-GitHub inside the Proton prefix; `launcher.log` shows `natives: wrote N
-translation(s)`). Without internet access run
-`python3 tools/natives/crossmap_from_fivem.py --version 1.0.3889.0` on the
-Linux side and copy the file next to `orange-core.dll`.
+`natives-<version>.txt` next to the DLL. Two things produce it, and the first
+one that succeeds wins:
+
+1. `gta-orange-proton.sh` generates it before injecting: it finds `GTA5.exe`
+   in your Steam libraries, reads the game version straight out of the
+   executable and runs `crossmap_from_fivem.py` (shipped in the client
+   package). Needs `python3` and internet on the Linux side. The run prints
+   `Natives crossmap: natives-<version>.txt (N translations)`.
+2. `Launcher.exe` does the same from inside the prefix when the file is still
+   missing (`launcher.log` shows `natives: wrote N translation(s)`).
+
+The launcher reads the game version from the running process when it cannot
+open the game file itself, which is the normal case under Proton: the game's
+own path is a drive mapping (`S:\...`) that the launcher process often cannot
+open. To build the file by hand:
+
+```bash
+python3 crossmap_from_fivem.py --exe "$HOME/.steam/debian-installation/steamapps/common/Grand Theft Auto V/GTA5.exe"
+```
+
+Without that file orange-core loads, patches the game and installs its hooks,
+but does not start any script, because every native call would go to a hash
+this build does not register. `client.log` and the script output both say so.
 
 What the client still cannot do on a current build is described in
 `docs/PORTING_STATUS.md` (section 4): the structure layouts used by the
