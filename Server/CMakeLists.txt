@@ -34,7 +34,8 @@ target_include_directories(orange_server PRIVATE
 
 target_compile_definitions(orange_server PRIVATE
   _SERVER
-  PROJECT_NAME="orange_server")
+  PROJECT_NAME="orange_server"
+  "$<$<COMPILE_LANGUAGE:C,CXX>:ORANGE_VERSION=\"${ORANGE_VERSION_STRING}\">")
 
 target_link_libraries(orange_server PRIVATE raknet yamlcpp civetweb Threads::Threads ${CMAKE_DL_LIBS})
 if(WIN32)

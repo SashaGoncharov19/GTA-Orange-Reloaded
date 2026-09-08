@@ -4,9 +4,18 @@
 #include "stdafx.h"
 #include "Launcher.h"
 #include "Injector.h"
+#include "Updater.h"
+#include "LauncherLog.h"
 #include <thread>
+#include <mutex>
 
 #define MAX_LOADSTRING 100
+#ifndef ORANGE_VERSION
+#define ORANGE_VERSION "dev"
+#endif
+#define ORANGE_WIDEN2(x) L##x
+#define ORANGE_WIDEN(x) ORANGE_WIDEN2(x)
+#define ORANGE_VERSION_W ORANGE_WIDEN(ORANGE_VERSION)
 #define PIRATE_EXECUTABLE_SIZE 54528512
 
 // Глобальные переменные:
@@ -15,6 +24,8 @@ WCHAR szTitle[MAX_LOADSTRING] = L"GTA:Orange Launcher";
 WCHAR szWindowClass[MAX_LOADSTRING] = L"_gtaorange_launcher";
 Image* pBitmap = NULL;
 float loadProgress = 0.0;
+static std::wstring g_splashStatus;
+static std::mutex g_statusMutex;
 HWND splashHwnd = NULL;
 ULONG_PTR m_gdiplusToken;
 
@@ -24,6 +35,17 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 void				UpdateSplash(float progress);
+
+// Text shown below the progress bar of the splash screen (thread safe).
+void SetSplashStatus(const std::wstring& status)
+{
+	{
+		std::lock_guard<std::mutex> lock(g_statusMutex);
+		g_splashStatus = status;
+	}
+	if (splashHwnd)
+		InvalidateRect(splashHwnd, NULL, FALSE);
+}
 
 void UpdateSplash(float progress)
 {
@@ -55,6 +77,10 @@ void UpdateSplash(float progress)
 struct LaunchOptions
 {
 	bool injectOnly = false;
+	bool checkUpdates = true;     // --no-update
+	bool forceUpdate = false;     // --update (also updates -dev builds)
+	bool afterUpdate = false;     // --updated (internal: just restarted after a self-update)
+	std::wstring channel;         // --channel stable|nightly (overrides launcher.xml)
 	bool waitForUnpack = true;
 	bool forceSteam = false;
 	bool forceDirect = false;
@@ -74,6 +100,10 @@ static void ShowUsage()
 		L"  --direct            start GTA5.exe directly\n"
 		L"  --no-unpack-wait    do not wait for the executable to be unpacked before injecting\n"
 		L"  --timeout <sec>     how long to wait for GTA5.exe (default 600)\n"
+		L"  --no-update         skip the update check\n"
+		L"  --update            force an update check (even for development builds)\n"
+		L"  --channel <name>    update channel: stable (default) or nightly\n"
+		L"  --version           show the launcher version\n"
 		L"  --help              show this message",
 		L"GTA:Orange Launcher", MB_OK | MB_ICONINFORMATION);
 }
@@ -100,6 +130,19 @@ static bool ParseCommandLine(LaunchOptions& options)
 			options.gameDir = argv[++i];
 		else if (arg == L"--timeout" && i + 1 < argc)
 			options.timeoutSeconds = _wtoi(argv[++i]);
+		else if (arg == L"--no-update")
+			options.checkUpdates = false;
+		else if (arg == L"--update")
+			options.forceUpdate = true;
+		else if (arg == L"--updated")
+			options.afterUpdate = true;
+		else if (arg == L"--channel" && i + 1 < argc)
+			options.channel = argv[++i];
+		else if (arg == L"--version" || arg == L"-v")
+		{
+			MessageBoxW(NULL, L"GTA:Orange Launcher " ORANGE_VERSION_W, L"GTA:Orange Launcher", MB_OK | MB_ICONINFORMATION);
+			ok = false;
+		}
 		else if (arg == L"--help" || arg == L"-h" || arg == L"/?")
 		{
 			ShowUsage();
@@ -123,6 +166,72 @@ static std::wstring GetLauncherDir()
 	std::wstring full(path);
 	size_t pos = full.find_last_of(L"\\/");
 	return pos == std::wstring::npos ? full : full.substr(0, pos);
+}
+
+static std::wstring FromUtf8(const char* text)
+{
+	if (!text || !*text)
+		return std::wstring();
+	int len = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
+	std::wstring out(len > 0 ? len - 1 : 0, L'\0');
+	if (len > 1)
+		MultiByteToWideChar(CP_UTF8, 0, text, -1, &out[0], len);
+	return out;
+}
+
+// launcher.xml next to Launcher.exe:
+//   <launcher><updates enabled="true" channel="stable" repository="owner/repo"/></launcher>
+static void LoadLauncherSettings(const std::wstring& dir, UpdaterSettings& settings)
+{
+	std::ifstream in(dir + L"\\launcher.xml", std::ios::binary);
+	if (!in)
+		return;
+	std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+	tinyxml2::XMLDocument doc;
+	if (doc.Parse(content.c_str(), content.size()) != tinyxml2::XML_SUCCESS)
+	{
+		LauncherLog("launcher.xml could not be parsed, using defaults");
+		return;
+	}
+	tinyxml2::XMLElement* root = doc.FirstChildElement("launcher");
+	tinyxml2::XMLElement* updates = root ? root->FirstChildElement("updates") : NULL;
+	if (!updates)
+		return;
+	updates->QueryBoolAttribute("enabled", &settings.enabled);
+	if (const char* channel = updates->Attribute("channel"))
+		settings.channel = FromUtf8(channel);
+	if (const char* repository = updates->Attribute("repository"))
+		settings.repository = FromUtf8(repository);
+}
+
+// Starts a fresh copy of (the just updated) Launcher.exe with the same
+// arguments and exits.
+static void RestartLauncher()
+{
+	wchar_t exe[MAX_PATH] = { 0 };
+	GetModuleFileNameW(NULL, exe, MAX_PATH);
+	std::wstring commandLine = GetCommandLineW();
+	commandLine += L" --updated";
+	std::vector<wchar_t> buffer(commandLine.begin(), commandLine.end());
+	buffer.push_back(L'\0');
+
+	STARTUPINFOW si;
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	PROCESS_INFORMATION pi;
+	ZeroMemory(&pi, sizeof(pi));
+	if (CreateProcessW(exe, buffer.data(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+	{
+		CloseHandle(pi.hThread);
+		CloseHandle(pi.hProcess);
+		LauncherLog("restarting after self-update");
+	}
+	else
+	{
+		LauncherLog("restart after self-update failed");
+		MessageBoxW(NULL, L"The launcher was updated. Please start it again.", L"GTA:Orange Launcher", MB_OK | MB_ICONINFORMATION);
+	}
+	TerminateProcess(GetCurrentProcess(), 0);
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -167,6 +276,41 @@ void LaunchGame()
 	{
 		std::wstring orangeDir = GetLauncherDir();
 		SetCurrentDirectoryW(orangeDir.c_str());
+		LauncherLogInit(orangeDir);
+		Updater::CleanupAfterRestart(orangeDir);
+
+		// Auto-update (never blocks the game start: failures are logged only).
+		if (g_options.checkUpdates && !g_options.afterUpdate)
+		{
+			UpdaterSettings settings;
+			LoadLauncherSettings(orangeDir, settings);
+			if (!g_options.channel.empty())
+				settings.channel = g_options.channel;
+			if (g_options.forceUpdate)
+			{
+				settings.enabled = true;
+				settings.force = true;
+			}
+			Updater updater(orangeDir, ORANGE_VERSION, settings, [](const std::wstring& status, float progress)
+			{
+				SetSplashStatus(status);
+				UpdateSplash(progress);
+			});
+			UpdateResult result = updater.Run();
+			if (result == UpdateResult::RestartRequired)
+			{
+				SetSplashStatus(L"Restarting...");
+				RestartLauncher();
+				return;
+			}
+			if (result == UpdateResult::Failed)
+			{
+				LauncherLog("updater: " + updater.LastError());
+				SetSplashStatus(L"Update check failed, starting anyway");
+				Sleep(1500);
+			}
+		}
+		SetSplashStatus(g_options.injectOnly ? L"Waiting for GTA5.exe..." : L"Starting GTA V...");
 
 		Registry::CreateRegKeyStructure(HKEY_CURRENT_USER, L"SOFTWARE\\GTA Orange Team\\GTA Orange");
 		Registry::Set_StringRegistryValue(HKEY_CURRENT_USER, L"SOFTWARE\\GTA Orange Team\\GTA Orange", L"OrangeFolder", orangeDir.c_str());
@@ -312,6 +456,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		SolidBrush frontPen(Gdiplus::Color(255, 130, 0));
 		g.FillRectangle(&backPen, 67, 220, 168, 6);
 		g.FillRectangle(&frontPen, 67, 220, (int)round(168 * loadProgress), 6);
+		{
+			std::lock_guard<std::mutex> lock(g_statusMutex);
+			if (!g_splashStatus.empty())
+			{
+				Gdiplus::Font font(L"Segoe UI", 8.5f);
+				if (font.GetLastStatus() == Gdiplus::Ok)
+				{
+					Gdiplus::SolidBrush textBrush(Gdiplus::Color(255, 255, 255, 255));
+					Gdiplus::StringFormat format;
+					format.SetAlignment(Gdiplus::StringAlignmentCenter);
+					Gdiplus::RectF layout(10.0f, 232.0f, 280.0f, 40.0f);
+					g.DrawString(g_splashStatus.c_str(), -1, &font, layout, &format, &textBrush);
+				}
+			}
+		}
 		SwapBuffers(hdc);
 		EndPaint(hWnd, &ps);
 	}

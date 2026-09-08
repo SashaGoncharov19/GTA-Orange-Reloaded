@@ -34,7 +34,10 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 		isDev.close();
 
 		my_ostream::SetLogFile(CGlobals::Get().orangePath + "/client.log");
-		log_info << "orange-core loaded from " << CGlobals::Get().orangePath << std::endl;
+#ifndef ORANGE_VERSION
+#define ORANGE_VERSION "dev"
+#endif
+		log_info << "orange-core " << ORANGE_VERSION << " loaded from " << CGlobals::Get().orangePath << std::endl;
 
 		if (!PreLoadPatches())
 		{

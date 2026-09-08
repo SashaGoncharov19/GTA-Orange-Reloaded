@@ -81,8 +81,21 @@ protontricks-launch --appid 271590 ./Launcher.exe --inject   # alternative
 `Launcher.exe --help` lists all launcher options (`--inject`, `--game-dir`,
 `--timeout`, `--no-unpack-wait`, ...).
 
+### Automatic updates under Proton
+
+`Launcher.exe` checks the GitHub releases for a newer client before every
+start (see `launcher.xml`; `--no-update` disables it, `--channel nightly`
+follows the master builds). The download uses WinHTTP inside the Proton
+prefix; if it fails (no network in the prefix, missing TLS support) the
+launcher logs the reason to `launcher.log` and starts the game anyway. In that
+case update the client folder by hand from the releases page.
+
+The Linux server has its own updater: `./update-server.sh` in the server
+folder (`--channel nightly` for nightly builds).
+
 ### Where things are logged
 
+* `launcher.log` next to `Launcher.exe` – launcher and auto-updater activity.
 * `client.log` next to `orange-core.dll` – everything the client core does,
   including the **game build check** (see below).
 * Proton/Wine output – run the script from a terminal; add `WINEDEBUG=+loaddll`

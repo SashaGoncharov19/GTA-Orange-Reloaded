@@ -77,7 +77,8 @@ target_include_directories(orange-core PRIVATE
   "${CMAKE_SOURCE_DIR}/deps/RakNet/DependentExtensions/portaudio_v18_1/pa_win_wmme")
 
 target_compile_definitions(orange-core PRIVATE
-  _WINDOWS _USRDLL ORANGECORE_EXPORTS UNICODE _UNICODE)
+  _WINDOWS _USRDLL ORANGECORE_EXPORTS UNICODE _UNICODE
+  "$<$<COMPILE_LANGUAGE:C,CXX>:ORANGE_VERSION=\"${ORANGE_VERSION_STRING}\">")
 
 target_link_libraries(orange-core PRIVATE
   raknet tinyxml2 luajit

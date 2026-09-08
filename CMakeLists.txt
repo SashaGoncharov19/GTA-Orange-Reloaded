@@ -18,6 +18,13 @@ option(ORANGE_BUILD_CLIENT "Build the game client: Launcher.exe + orange-core.dl
 option(ORANGE_BUILD_TOOLS "Build helper tools (font-converter, luajit interpreter)" ON)
 option(ORANGE_LUA_MYSQL "Enable MySQL support in lua-module when a MySQL/MariaDB client library is found" ON)
 option(ORANGE_ENABLE_SCALEFORM "Compile the experimental Scaleform DrawText code into orange-core (needs the proprietary GFx SDK libraries)" OFF)
+option(ORANGE_BUILD_TESTS "Build the unit tests (ctest)" ON)
+
+# Version string embedded in the binaries and used by the auto-updater. CI sets
+# it to the release tag (e.g. 0.2.0) or to a nightly id (nightly-YYYYMMDD-sha);
+# local builds are "<version>-dev" and are never replaced by the updater.
+set(ORANGE_VERSION_STRING "${PROJECT_VERSION}-dev" CACHE STRING "Version string embedded in the binaries")
+file(WRITE "${CMAKE_BINARY_DIR}/version.txt" "${ORANGE_VERSION_STRING}\n")
 
 if(ORANGE_BUILD_CLIENT AND NOT (WIN32 AND MSVC))
   message(FATAL_ERROR "The client (orange-core.dll / Launcher.exe) can only be built with MSVC on Windows. Configure with -DORANGE_BUILD_CLIENT=OFF.")
@@ -95,6 +102,9 @@ if(ORANGE_BUILD_SERVER)
 
   # runtime files (sample config, Lua API bootstrap, example resource)
   install(DIRECTORY "${CMAKE_SOURCE_DIR}/runtime/server/" DESTINATION server COMPONENT server)
+  install(FILES "${CMAKE_BINARY_DIR}/version.txt" DESTINATION server COMPONENT server)
+  install(PROGRAMS "${CMAKE_SOURCE_DIR}/tools/update-server.sh" DESTINATION server COMPONENT server)
+  install(FILES "${CMAKE_SOURCE_DIR}/tools/update-server.ps1" DESTINATION server COMPONENT server)
   add_custom_target(orange_server_runtime ALL
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_SOURCE_DIR}/runtime/server" "${ORANGE_SERVER_OUTPUT_DIR}"
     COMMENT "Copying server runtime files to ${ORANGE_SERVER_OUTPUT_DIR}")
@@ -108,6 +118,7 @@ if(ORANGE_BUILD_CLIENT)
   add_subdirectory(orange-core)
   add_subdirectory(Launcher)
   install(DIRECTORY "${CMAKE_SOURCE_DIR}/runtime/client/" DESTINATION client COMPONENT client)
+  install(FILES "${CMAKE_BINARY_DIR}/version.txt" DESTINATION client COMPONENT client)
   add_custom_target(orange_client_runtime ALL
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_SOURCE_DIR}/runtime/client" "${ORANGE_CLIENT_OUTPUT_DIR}"
     COMMENT "Copying client runtime files to ${ORANGE_CLIENT_OUTPUT_DIR}")
@@ -115,16 +126,20 @@ if(ORANGE_BUILD_CLIENT)
 endif()
 
 # ------------------------------------------------------------------------------
-# Tools
+# Tools & tests
 # ------------------------------------------------------------------------------
 if(ORANGE_BUILD_TOOLS)
   add_subdirectory(font-converter)
+endif()
+if(ORANGE_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
 endif()
 
 # ------------------------------------------------------------------------------
 # Summary
 # ------------------------------------------------------------------------------
-message(STATUS "GTA:Orange ${PROJECT_VERSION}")
+message(STATUS "GTA:Orange ${PROJECT_VERSION} (version string: ${ORANGE_VERSION_STRING})")
 message(STATUS "  Build type ........ ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Server ............ ${ORANGE_BUILD_SERVER}")
 message(STATUS "  Client ............ ${ORANGE_BUILD_CLIENT}")

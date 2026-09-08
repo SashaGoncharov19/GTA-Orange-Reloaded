@@ -32,6 +32,7 @@ tags `v*` create versioned releases. Each release contains:
 * `gta-orange-server-linux-x64.tar.gz` - dedicated server for Linux (glibc >= 2.35)
 * `gta-orange-server-win64.zip` - dedicated server for Windows
 * `gta-orange-client-win64.zip` - `Launcher.exe` + `orange-core.dll` + the Proton helper script
+* `client-manifest.txt`, `orange-core.dll`, `Launcher.exe`, `server-version.txt` - consumed by the auto-updater
 
 The same files are attached as artifacts to every CI run (Actions tab), and
 the server is published as a Docker image:
@@ -77,6 +78,26 @@ The client connects to the server address configured in
 next to the DLL enables the direct-connect fields in the in-game server
 browser.
 
+### Automatic updates
+
+Nothing has to be downloaded by hand after the first install:
+
+* **Client:** every time `Launcher.exe` starts it fetches
+  `client-manifest.txt` from the GitHub releases (`stable` channel = latest
+  release, `nightly` = latest `master` build), compares SHA-256 hashes with the
+  local `orange-core.dll` / `Launcher.exe`, downloads what changed, verifies it
+  and swaps the files in place (the launcher replaces itself and restarts).
+  Configure it in `launcher.xml` next to the launcher or with `--no-update`,
+  `--update`, `--channel nightly`. Everything is logged to `launcher.log`.
+  A failed update check never blocks the game start. Development builds
+  (`-dev` version) are left alone unless `--update` is given.
+* **Server:** run `./update-server.sh` (Linux) or `.\update-server.ps1`
+  (Windows) inside the server folder. The scripts compare `version.txt` with
+  `server-version.txt` of the release, replace the binaries, the Lua API
+  bootstrap and the examples, and leave `config.yml` and `resources/`
+  untouched. Add `--channel nightly` / `-Channel nightly` for nightly builds.
+  Docker users just pull the new image tag.
+
 > **Important:** `orange-core.dll` hooks `GTA5.exe` through hard-coded offsets
 > from the **January 2017** game build. On any other build it now detects the
 > mismatch, logs it to `client.log` and stays inactive instead of crashing the
@@ -113,6 +134,8 @@ after every build. Useful options:
 | `ORANGE_BUILD_TOOLS` | `ON` | build `font-converter` and the `luajit` interpreter |
 | `ORANGE_LUA_MYSQL` | `ON` | link lua-module against MySQL/MariaDB client if found (else `_LUA_NOSQL`) |
 | `ORANGE_ENABLE_SCALEFORM` | `OFF` | compile the experimental Scaleform DrawText code (needs the proprietary GFx SDK libraries) |
+| `ORANGE_BUILD_TESTS` | `ON` | build the unit tests (`ctest --output-on-failure` in the build folder) |
+| `ORANGE_VERSION_STRING` | `<version>-dev` | version embedded in the binaries; CI sets the release tag or a nightly id |
 | `LUAJIT_ENABLE_GC64` | `OFF` | build LuaJIT in GC64 mode |
 
 The old Visual Studio solution (`Launcher.sln`) is kept for reference but the
@@ -122,9 +145,17 @@ CMake build is the supported way to compile the project.
 
 `.github/workflows/build.yml` builds the Linux server (inside `ubuntu:22.04`
 for wide glibc compatibility) and the Windows server + client (MSVC 2022),
-smoke-tests both servers (start, HTTP request, log check), uploads the
-packages as artifacts, updates the `nightly` release on `master`, creates
-releases for `v*` tags and pushes the server Docker image to GHCR.
+runs the unit tests, smoke-tests both servers (start, HTTP request, log check),
+uploads the packages as artifacts, updates the `nightly` release on `master`,
+creates releases for `v*` tags and pushes the server Docker image to GHCR.
+
+Every release also carries the files the auto-updater consumes:
+`client-manifest.txt` (version + SHA-256 of each client file), the raw
+`orange-core.dll` and `Launcher.exe`, and `server-version.txt`. The version
+string embedded in the binaries is the tag (`0.2.0`) for releases and
+`nightly-YYYYMMDD-<sha>` for master builds (`-DORANGE_VERSION_STRING=...`).
+
+To publish a release: `git tag v0.3.0 && git push origin v0.3.0`.
 
 ## Known limitations
 

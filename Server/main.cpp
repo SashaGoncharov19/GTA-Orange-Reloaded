@@ -32,6 +32,10 @@ int main(void)
 	std::signal(SIGINT, OnSignal);
 	std::signal(SIGTERM, OnSignal);
 
+#ifndef ORANGE_VERSION
+#define ORANGE_VERSION "dev"
+#endif
+	log << "GTA:Orange server " << ORANGE_VERSION << std::endl;
 	log << "Starting the server..." << std::endl;
 	log << "Hostname: " << /*color::lred <<*/ CConfig::Get()->Hostname << std::endl;
 	log << "Port: " << /*color::lred <<*/ CConfig::Get()->Port << std::endl;
