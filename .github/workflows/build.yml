@@ -163,9 +163,17 @@ jobs:
           if (-not (Select-String -Path server.log -Pattern "Server started" -Quiet)) { throw "server did not start" }
           Remove-Item stdin.txt, server.log, server.err -ErrorAction SilentlyContinue
 
-      - name: Add Proton helper to the client package
-        shell: pwsh
-        run: Copy-Item tools/proton/gta-orange-proton.sh dist/client/
+      # The shell scripts end up on Linux machines; strip the CRLF that git on
+      # the Windows runner may have added at checkout (see also .gitattributes).
+      - name: Add Proton helper to the client package (LF line endings)
+        shell: bash
+        run: |
+          tr -d '\r' < tools/proton/gta-orange-proton.sh > dist/client/gta-orange-proton.sh
+          for f in dist/server/update-server.sh dist/client/gta-orange-proton.sh; do
+            tr -d '\r' < "$f" > "$f.lf" && mv -f "$f.lf" "$f"
+            if grep -q $'\r' "$f"; then echo "CRLF still present in $f"; exit 1; fi
+          done
+          bash -n dist/client/gta-orange-proton.sh
 
       - name: Package
         shell: pwsh
