@@ -55,8 +55,7 @@ if(MSVC)
     _CRT_NONSTDC_NO_DEPRECATE
     _WINSOCK_DEPRECATED_NO_WARNINGS
     _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
-    _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
-    NOMINMAX)
+    _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
   # Only for C/C++: CMake would otherwise hand these to rc.exe as well.
   # (C4838: the embedded Lua bytecode arrays trigger it a few thousand times)
   foreach(_flag /bigobj /wd4996 /wd4267 /wd4244 /wd4800 /wd4305 /wd4838 /wd4309)
