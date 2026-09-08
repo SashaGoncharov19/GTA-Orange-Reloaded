@@ -226,6 +226,15 @@ set +e
 status=$?
 set -e
 
+# After a self-update the launcher starts a new copy of itself; wait for it
+# too, otherwise the logs below are shown before the injection happened.
+waited=0
+while pgrep -f 'Launcher\.exe.*--inject' >/dev/null 2>&1 && [ "$waited" -lt 300 ]; do
+	[ "$waited" -eq 0 ] && log "The launcher restarted itself after an update, waiting for it to finish"
+	sleep 2
+	waited=$((waited + 2))
+done
+
 if [ "$status" -eq 0 ]; then
 	log "Launcher.exe finished (exit code 0)"
 else

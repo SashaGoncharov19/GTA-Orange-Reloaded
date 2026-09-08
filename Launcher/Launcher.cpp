@@ -224,8 +224,17 @@ static void RestartLauncher()
 	if (CreateProcessW(exe, buffer.data(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
 	{
 		CloseHandle(pi.hThread);
+		LauncherLog("restarting after self-update, waiting for the new launcher to finish");
+		// Stay alive (hidden) until the restarted launcher is done, so that
+		// whoever started us (gta-orange-proton.sh, a shortcut) sees the real
+		// outcome and exit code instead of an early "finished".
+		if (splashHwnd)
+			ShowWindow(splashHwnd, SW_HIDE);
+		WaitForSingleObject(pi.hProcess, INFINITE);
+		DWORD code = 1;
+		GetExitCodeProcess(pi.hProcess, &code);
 		CloseHandle(pi.hProcess);
-		LauncherLog("restarting after self-update");
+		TerminateProcess(GetCurrentProcess(), code);
 	}
 	else
 	{
