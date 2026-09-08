@@ -97,10 +97,20 @@ which one it is.
 
 ## Finding offsets
 
-You need a disassembler (IDA, Ghidra, Binary Ninja) or a debugger (x64dbg)
-and a **dumped** `GTA5.exe`: the retail executable is packed, so the code
-must be dumped from the running process (the launcher waits for the unpack
-before injecting; tools such as Scylla/x64dbg can write the dump).
+You need a disassembler (IDA, Ghidra, Binary Ninja) and a **dumped**
+`GTA5.exe`: the retail executable is protected on disk, the code only exists
+in clear inside the running process. The launcher writes such a dump for you:
+
+```bash
+./gta-orange-proton.sh --dump-game        # Linux / Proton
+Launcher.exe --inject --dump-game         # Windows, game already running
+```
+
+It produces `GTA5-<version>.dump.exe` next to the launcher with the section
+table rewritten so that file offsets equal RVAs: an address shown by the
+disassembler (with the image base set to 0, or minus the image base) is the
+value for `offsets.ini`. See also `docs/PORTING_STATUS.md` for the overall
+picture, including the route that avoids most offsets (ScriptHookV).
 
 Three groups of entries, from easy to hard:
 

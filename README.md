@@ -164,6 +164,13 @@ string embedded in the binaries is the tag (`0.2.0`) for releases and
 
 To publish a release: `git tag v0.3.0 && git push origin v0.3.0`.
 
+## Porting to a current GTA V build
+
+The status after the first run on GTA V 1.0.3889.0, the three layers a port
+needs (addresses, native hashes, structures), the recommended route and the
+list of what to find are in [docs/PORTING_STATUS.md](docs/PORTING_STATUS.md).
+`Launcher.exe --dump-game` writes the unpacked game image for a disassembler.
+
 ## Known limitations
 
 * **Game build:** the built-in offsets target the GTA V build of January

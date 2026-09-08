@@ -49,9 +49,9 @@ static const Entry g_entries[] = {
 	{ "ShutdownLoadingScreen",            0x1FBD34,  NULL, 0, REQ, "void(); native SHUTDOWN_LOADING_SCREEN implementation" },
 	{ "DoScreenFadeIn",                   0x2A1554,  NULL, 0, REQ, "void(int64 duration); native DO_SCREEN_FADE_IN implementation" },
 	{ "HasScriptLoaded",                  0xCE37E0,  NULL, 0, REQ, "bool(const char* scriptName); native HAS_SCRIPT_LOADED implementation" },
-	{ "CanLangChange",                    0x1C183F,  NULL, 0, REQ, "instruction with a 2-byte opcode + rel32 to a global; global + 1 is the 'language can change' bool toggled while the chat is open" },
+	{ "CanLangChange",                    0x1C183F,  NULL, 0, OPT, "instruction with a 2-byte opcode + rel32 to a global; global + 1 is the 'language can change' bool toggled while the chat is open (a private bool is used when unresolved)" },
 	{ "InitializeOnline",                 0x103708,  NULL, 0, OPT, "void(); not called by the current code" },
-	{ "InitHUD",                          0x1F356C,  NULL, 0, REQ, "void(); HUD initialisation called once from the LookAlive hook (original code: 0x1F358F - 0x23)" },
+	{ "InitHUD",                          0x1F356C,  NULL, 0, OPT, "void(); HUD initialisation called once from the LookAlive hook, skipped when unresolved (original code: 0x1F358F - 0x23)" },
 	{ "EventHook",                        0x7FFF0C,  NULL, 0, OPT, "task event function start, replaced by a far jump to an empty handler" },
 
 	// --- main loop hooks (HookLoop) -------------------------------------------
@@ -114,7 +114,7 @@ static const Entry g_entries[] = {
 	{ "ScrThreadCount",                   0x14AFE13,
 	  "FF 0D ? ? ? ? 48 8B D9 75 @ 0 | FF 0D ? ? ? ? 48 8B F9 @ 0", 0, REQ,
 	  "'dec dword [rip+X]' of the script thread count; rel32 at +2 (patterns from FiveM-style hooks, unverified)" },
-	{ "RegistrationTable",                0x14B1A55, "76 61 49 8B 7A 40 48 8D 0D", 6, REQ, "'lea rcx, [rip+X]' of the native registration table; rel32 at +3 (unverified pattern; original code: 0x14B1A4F + 6)" },
+	{ "RegistrationTable",                0x14B1A55, "76 32 48 8B 53 40 @ 6 | 76 61 49 8B 7A 40 48 8D 0D @ 6", 6, REQ, "3-byte-opcode instruction + rel32 to the native registration table (lea); rel32 at +3 (patterns from FiveM-style hooks, unverified; original code: 0x14B1A4F + 6)" },
 	{ "ScriptHandlerMgr",                 0x9ED224,  "74 17 48 8B C8 E8 ? ? ? ? 48 8D 0D", 10, REQ, "'lea rcx, [rip+X]' of the script handler manager; rel32 at +3 (unverified pattern; original code: 0x9ED21A + 10)" },
 	{ "GetScriptIdBlock",                 0x14B4CCA, "74 41 48 8B 01 FF 50 10 84 C0 @ 0 | 74 3C 48 8B 01 FF 50 10 84 C0 @ 0", 0, REQ, "ERR_SYS_PURE check; the two bytes at +4 are inspected (patterns from FiveM-style hooks, unverified)" },
 	{ "ScriptThreadTick",                 0x9F645C,  "80 B9 46 01 00 00 00 8B FA 48 8B D9 74 05", -0xF, REQ, "eThreadState __thiscall(scrThread*, uint32 opsToExecute) (unverified pattern; original code: 0x9F646B - 0xF)" },

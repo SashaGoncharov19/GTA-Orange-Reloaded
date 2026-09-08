@@ -358,6 +358,141 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 }
 
 
+// "1.0.3889.0" from the version resource of the executable on disk, or "" when
+// it cannot be read.
+static std::wstring FileVersionOf(const std::wstring& path)
+{
+	DWORD handle = 0;
+	DWORD size = GetFileVersionInfoSizeW(path.c_str(), &handle);
+	if (!size)
+		return L"";
+	std::vector<char> buffer(size);
+	if (!GetFileVersionInfoW(path.c_str(), 0, size, buffer.data()))
+		return L"";
+	VS_FIXEDFILEINFO* info = NULL;
+	UINT length = 0;
+	if (!VerQueryValueW(buffer.data(), L"\\", (LPVOID*)&info, &length) || !info || length < sizeof(VS_FIXEDFILEINFO))
+		return L"";
+	wchar_t text[64];
+	swprintf_s(text, L"%u.%u.%u.%u", HIWORD(info->dwFileVersionMS), LOWORD(info->dwFileVersionMS),
+		HIWORD(info->dwFileVersionLS), LOWORD(info->dwFileVersionLS));
+	return text;
+}
+
+// The retail executable is protected on disk; the code only exists in clear
+// inside the running process. This copies the whole image page by page
+// (unreadable pages are zeroed) and rewrites the section table so that the
+// file offsets equal the RVAs, which is what disassemblers expect from a
+// memory dump. Nothing is written back to the game.
+bool Injector::DumpGame(const std::wstring& outputDir, std::wstring& writtenPath, std::string& error)
+{
+	int pid = FindProcess(PROCESS_NAME);
+	if (pid == -1)
+	{
+		error = "GTA5.exe is not running";
+		return false;
+	}
+
+	uintptr_t base = 0;
+	DWORD imageSize = 0;
+	std::wstring exePath;
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
+	if (snapshot != INVALID_HANDLE_VALUE)
+	{
+		MODULEENTRY32 entry;
+		entry.dwSize = sizeof(entry);
+		if (Module32First(snapshot, &entry))
+		{
+			do {
+				if (_wcsicmp(PROCESS_NAME, entry.szModule) == 0)
+				{
+					base = (uintptr_t)entry.modBaseAddr;
+					imageSize = entry.modBaseSize;
+					exePath = entry.szExePath;
+					break;
+				}
+			} while (Module32Next(snapshot, &entry));
+		}
+		CloseHandle(snapshot);
+	}
+	if (!base || !imageSize)
+	{
+		error = "GTA5.exe module not found in process " + std::to_string(pid);
+		return false;
+	}
+	LauncherLog("dump: GTA5.exe pid " + std::to_string(pid) + ", image base 0x" + std::to_string((unsigned long long)base)
+		+ " (decimal), image size " + std::to_string(imageSize) + " bytes");
+
+	HANDLE process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+	if (!process)
+	{
+		error = "OpenProcess failed (" + LastErrorText() + ")";
+		return false;
+	}
+	std::vector<unsigned char> image(imageSize);
+	const SIZE_T page = 0x1000;
+	SIZE_T unreadable = 0;
+	for (SIZE_T offset = 0; offset < imageSize; offset += page)
+	{
+		SIZE_T chunk = (imageSize - offset) < page ? (imageSize - offset) : page;
+		SIZE_T read = 0;
+		if (!ReadProcessMemory(process, (LPCVOID)(base + offset), &image[offset], chunk, &read) || read != chunk)
+		{
+			memset(&image[offset], 0, chunk);
+			unreadable += chunk;
+		}
+	}
+	CloseHandle(process);
+
+	if (imageSize < sizeof(IMAGE_DOS_HEADER))
+	{
+		error = "image too small";
+		return false;
+	}
+	IMAGE_DOS_HEADER* dos = (IMAGE_DOS_HEADER*)image.data();
+	if (dos->e_magic != IMAGE_DOS_SIGNATURE || (DWORD)dos->e_lfanew + sizeof(IMAGE_NT_HEADERS64) > imageSize)
+	{
+		error = "the dumped image has no valid PE header (was the first page readable?)";
+		return false;
+	}
+	IMAGE_NT_HEADERS64* nt = (IMAGE_NT_HEADERS64*)(image.data() + dos->e_lfanew);
+	if (nt->Signature != IMAGE_NT_SIGNATURE)
+	{
+		error = "the dumped image has no valid PE header";
+		return false;
+	}
+	DWORD align = nt->OptionalHeader.SectionAlignment ? nt->OptionalHeader.SectionAlignment : 0x1000;
+	IMAGE_SECTION_HEADER* sections = IMAGE_FIRST_SECTION(nt);
+	for (WORD i = 0; i < nt->FileHeader.NumberOfSections; ++i)
+	{
+		DWORD size = sections[i].Misc.VirtualSize ? sections[i].Misc.VirtualSize : sections[i].SizeOfRawData;
+		sections[i].PointerToRawData = sections[i].VirtualAddress;
+		sections[i].SizeOfRawData = (size + align - 1) / align * align;
+	}
+	nt->OptionalHeader.FileAlignment = align;
+
+	std::wstring version = exePath.empty() ? L"" : FileVersionOf(exePath);
+	if (version.empty())
+		version = L"unknown-version";
+	writtenPath = outputDir + L"\\GTA5-" + version + L".dump.exe";
+	std::ofstream out(writtenPath, std::ios::binary | std::ios::trunc);
+	if (!out)
+	{
+		error = "cannot write " + Utils::UnicodeToMultibyte(writtenPath);
+		return false;
+	}
+	out.write((const char*)image.data(), (std::streamsize)image.size());
+	if (!out.good())
+	{
+		error = "writing " + Utils::UnicodeToMultibyte(writtenPath) + " failed (disk full?)";
+		return false;
+	}
+	LauncherLog(L"dump: written " + writtenPath);
+	LauncherLog("dump: game version " + Utils::UnicodeToMultibyte(version) + ", " + std::to_string(unreadable)
+		+ " unreadable bytes zeroed; the file offsets equal the RVAs, so an address in the dump minus 0 is the RVA for offsets.ini");
+	return true;
+}
+
 Injector::~Injector()
 {
 }
