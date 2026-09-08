@@ -100,6 +100,7 @@ typedef hde64s HDE;
 #include "core/scrThread.h"
 #include "core/scrManager.h"
 #include "core/scrEngine.h"
+#include "core/NativeTable.h"
 #include "core/nativeCaller.h"
 #include "core/Script.h"
 #include "core/Natives.h"

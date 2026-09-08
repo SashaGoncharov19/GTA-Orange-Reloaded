@@ -1,0 +1,5 @@
+# Natives in orange-core/Core/Natives.h whose canonical hash is unknown.
+# Format: <function name in Natives.h> <hash of the January 2017 build>
+# Look the name up in a natives database (https://docs.fivem.net/natives), add
+# '// 0x<canonical hash>' to the line in Natives.h and re-run this script.
+APP_CLOSE_BLOCK 0x052AFDC086B24354

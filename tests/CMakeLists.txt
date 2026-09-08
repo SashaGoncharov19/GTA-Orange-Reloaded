@@ -16,3 +16,11 @@ set_target_properties(offsets_test PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/tests"
   FOLDER "tests")
 add_test(NAME offsets_test COMMAND offsets_test)
+
+# natives crossmap reader + the generated reference table (shared/NativeCrossmap.h)
+add_executable(natives_crossmap_test natives_crossmap_test.cpp)
+target_include_directories(natives_crossmap_test PRIVATE "${ORANGE_SHARED_DIR}" "${CMAKE_SOURCE_DIR}/orange-core/Core")
+set_target_properties(natives_crossmap_test PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/tests"
+  FOLDER "tests")
+add_test(NAME natives_crossmap_test COMMAND natives_crossmap_test)

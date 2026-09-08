@@ -57,50 +57,72 @@ between January 2017 and 1.0.3889.0:
 
 1. **Addresses** (this table). Patterns cover the script engine; the rest
    needs a disassembler.
-2. **Native hashes.** `orange-core/Core/Natives.h` calls every native by the
-   hash the 2017 build used. Rockstar reshuffles those every build, so on
-   1.0.3889.0 `ScriptEngine::GetNativeHandler()` finds nothing. The mapping
-   canonical hash → build hash ("crossmap") is needed. FiveM's copy
-   (`CrossMapping_Universal.h`) is **not** in its public repository;
-   ScriptHookV ships one inside a closed-source DLL. The natives *database*
-   (https://docs.fivem.net/natives, same data as NativeDB) gives names,
-   canonical hashes and signatures, i.e. the input for regenerating
-   `Natives.h`, but not the per-build hashes.
+2. **Native hashes.** Rockstar reshuffles the hashes natives are registered
+   under with every build, and since 1.0.1290 the registration table itself is
+   obfuscated. orange-core now handles both: `Natives.h` calls every native by
+   its **canonical** hash (the one every database uses, e.g.
+   https://docs.fivem.net/natives), `Core/NativeTable.cpp` translates it to
+   the running build and walks the plain or the obfuscated table. The
+   translation comes from a built-in table on the reference build and from
+   **`natives-<game version>.txt`** next to `orange-core.dll` on any other
+   build (`0x<canonical> 0x<build hash> [name]` per line). That file is the
+   missing piece for 1.0.3889.0: FiveM's copy is not public, ScriptHookV's is
+   inside a closed DLL. On every non-reference build orange-core writes
+   `natives-<version>.registered.txt` (build hash + handler RVA of every native
+   the game registered, once `RegistrationTable` resolves) as raw material.
 3. **Structure layouts.** `GTA/CRage.h`, `Core/scrThread.h`, entity pools
    (`CReplayInterface.h`), the task serialisation in `Network/*` read game
    structures by fixed member offsets from 2017.
 
-## 4. Recommended route: stand on ScriptHookV
+## 4. Route: the architecture stays (no ScriptHookV)
 
-orange-core re-implements what ScriptHookV (SHV) provides: a script thread,
-native invocation, a keyboard hook and a D3D `Present` callback. Rebuilding
-orange-core as an SHV plugin (`.asi`, loaded by SHV's ASI loader; no injector
-needed) removes almost every game address and the whole crossmap problem:
+Decision: keep orange-core's own script thread, native invocation and hooks;
+no ScriptHookV dependency. That means every layer of section 3 has to be
+reversed for 1.0.3889.0 and again for every future build. The plumbing for
+it is in place; the data is what has to be produced.
 
-| orange-core today | With the ScriptHookV SDK |
-|---|---|
-| own script thread (`ScrThreadCollection`, `ScrThreadId/Count`, `ScriptThreadTick/Kill/Init`, `ScriptHandlerMgr`, `GetScriptIdBlock`, `ActiveThreadTlsOffset`) | `scriptRegister()` + `WAIT()` |
-| `GetNativeHandler` + 2017 hashes in `Natives.h` | `nativeInit()/nativePush()/nativeCall()` with canonical hashes; regenerate `Natives.h` from the natives DB |
-| `GetEntityFromScriptHandle`, `GetEntityAddressCall` | `getScriptHandleBaseAddress()` |
-| D3D hook via the `SwapChain` global | `presentCallbackRegister()` |
-| `WindowCreateCall` hook (window handle / title) | `FindWindowA("grcWindow", NULL)` |
-| `LookAliveCall` / `GameStateChangeCall` hooks (per-frame work, game state) | do the work in the script thread; poll state with natives |
-| `ShutdownLoadingScreen`, `DoScreenFadeIn`, `HasScriptLoaded`, `TerminateAllScriptsWithThisName`, `ForceCleanupForAllThreadsWithThisName` | the natives of the same name |
-| most `GameProcessHooks` patches (population, wanted level, north blip, ...) | natives (`SET_VEHICLE_DENSITY_MULTIPLIER_THIS_FRAME`, `SET_PED_DENSITY_MULTIPLIER_THIS_FRAME`, `SET_MAX_WANTED_LEVEL`, `SET_BLIP_*`, ...) called every frame, the way SP multiplayer mods do it |
-| `ViewportGame` (world → screen for 3D text) | `GET_SCREEN_COORD_FROM_WORLD_COORD` |
-| `CWorld` / `CPed` member reads for sync | natives (`GET_ENTITY_VELOCITY`, `GET_GAMEPLAY_CAM_ROT`, `IS_PED_SHOOTING`, ...) |
-| task serialisation (`CSerialisedFSMTaskInfo`, `rageBuffer`, task heaps) | drop at first, sync tasks with `TASK_*` natives |
+### Natives: producing `natives-1.0.3889.0.txt`
 
-What stays: RakNet networking, the Lua/server side, chat and UI (ImGui on
-the SHV present callback), the offsets table for anything that still needs
-an address. The SDK is free (dev-c.com), updated within days of each game
-update, works under Proton, and refuses to run in GTA Online. Requirement
-for players: ScriptHookV + its ASI loader in the game folder, story mode
-with BattlEye off (an official Rockstar Games Launcher setting).
+Needed: the pairs canonical hash → 1.0.3889.0 hash for the natives orange-core
+uses (5179 in `Natives.h`, the full list with canonical hashes is
+`orange-core/Core/NativeCrossmap_Reference.h`; one native still lacks its
+canonical hash, see `tools/natives/natives-without-canonical.txt`).
 
-The alternative, keeping the 2017 architecture, means reversing all of
-section 5 on every game update plus building a crossmap. That is a
-maintenance job comparable to what FiveM / alt:V do full-time.
+Ways to get them, none of which needs ScriptHookV:
+
+1. **A per-build natives table that already exists.** Script decompilers for
+   GTA V ship a natives table per game build (they need it to name the natives
+   in decompiled `.ysc` scripts); repositories of decompiled scripts for build
+   3889 (or the closest build) carry it. Convert it to the file format above.
+2. **Script diffing.** The game's own scripts (`update.rpf`, `.ysc`) call
+   natives by the hash of their build. The same script decompiled from a build
+   with a known table and from 3889 aligns almost one to one; aligned call
+   sites give hash pairs. Tooling: CodeWalker / a `.ysc` decompiler.
+3. **Handler matching.** `natives-1.0.3889.0.registered.txt` lists every
+   registered hash with the RVA of its handler; the same list from a build with
+   a known table (or the handlers' code) can be matched function by function
+   (BinDiff-style). Handlers of simple natives are near-identical between
+   builds.
+
+A partial file is fine: untranslated natives are reported once in
+`client.log` and their calls do nothing.
+
+### Registration table
+
+`NativeTable.cpp` decodes the obfuscated layout the way FiveM does (next
+pointer, count and hashes XOR-ed with their own address). It is selected for
+every build ≥ 1.0.1290 that is not the reference build. If
+`natives-<version>.registered.txt` stays empty although `RegistrationTable`
+resolved, the layout changed again and the struct in `NativeTable.cpp` needs
+updating.
+
+### What stays reversed by hand
+
+Section 5 (addresses) and the structure layouts (`GTA/CRage.h`,
+`Core/scrThread.h`, `GTA/CReplayInterface.h`, `Network/*` task sync). The
+alternative route through the ScriptHookV SDK, which removes most of this,
+was considered and rejected; it is kept in the git history of this document
+for reference.
 
 ## 5. If the 2017 architecture is kept: what to find
 
@@ -155,9 +177,8 @@ To finish the port from here, send back:
 
 * the `offsets.ini` `[1.0.3889.0]` section with what resolved, plus
   `client.log` of the run;
-* the decision on the natives route (ScriptHookV SDK, or a crossmap and
-  where it comes from);
-* for the SHV route nothing else is needed to start; for the 2017 route the
-  structure offsets that changed (`CPed`, `CVehicle`, `CPlayerInfo`,
+* `natives-1.0.3889.0.txt` (section 4), even partial, and the
+  `natives-1.0.3889.0.registered.txt` orange-core wrote;
+* the structure offsets that changed (`CPed`, `CVehicle`, `CPlayerInfo`,
   `CViewportGame`, `ReplayInterfaces`, `scrThread`), ideally as a diff of
   the headers under `orange-core/GTA` and `orange-core/Core`.

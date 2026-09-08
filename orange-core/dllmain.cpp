@@ -14,6 +14,18 @@ std::string GetModuleDir()
 	return path.substr(0, path.find_last_of("\\/"));
 }
 
+// On a build other than the reference one, write the natives the game
+// registered (build hash + handler RVA) next to the DLL: the raw material
+// for natives-<version>.txt (docs/PORTING_STATUS.md). Runs on its own thread
+// a moment after injection, never inside the loader lock.
+static DWORD WINAPI DumpNativesThread(LPVOID)
+{
+	Sleep(3000);
+	std::string path = CGlobals::Get().orangePath + "\\natives-" + GameOffsets::GameVersion() + ".registered.txt";
+	NativeTable::DumpRegistered(path);
+	return 0;
+}
+
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
                        LPVOID lpReserved
@@ -39,7 +51,14 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 #endif
 		log_info << "orange-core " << ORANGE_VERSION << " loaded from " << CGlobals::Get().orangePath << std::endl;
 
-		if (!PreLoadPatches())
+		bool patched = PreLoadPatches();
+		if (GameOffsets::IsInitialized() && !GameOffsets::IsReferenceBuild())
+		{
+			HANDLE thread = CreateThread(NULL, 0, DumpNativesThread, NULL, 0, NULL);
+			if (thread)
+				CloseHandle(thread);
+		}
+		if (!patched)
 		{
 			log_error << "Game build check failed, GTA:Orange stays inactive" << std::endl;
 			std::string message =

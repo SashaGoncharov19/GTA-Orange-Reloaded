@@ -56,6 +56,8 @@ namespace GameOffsets
 	// Version of GTA5.exe from its version resource, e.g. "1.0.944.2".
 	// "unknown" when it cannot be read.
 	const std::string& GameVersion();
+	// Third component of the version ("1.0.3889.0" -> 3889), 0 when unknown.
+	int GameBuildNumber();
 
 	// Absolute address of a resolved entry, 0 when unresolved or disabled.
 	uintptr_t Address(const char* name);

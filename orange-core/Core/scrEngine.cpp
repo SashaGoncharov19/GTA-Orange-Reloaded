@@ -73,6 +73,7 @@ bool ScriptEngine::Initialize()
 		return false;
 	}
 	log_debug << "registrationTable\t " << std::hex << registrationTable << std::endl;
+	NativeTable::Initialize();
 
 	g_scriptHandlerMgr = reinterpret_cast<decltype(g_scriptHandlerMgr)>(g_scriptHandlerMgrPattern.getOffset());
 	if (g_scriptHandlerMgr == nullptr)
@@ -154,12 +155,9 @@ void ScriptEngine::CreateThread(ScriptThread * thread)
 	log_debug << "Created thread, id " << thread->GetId() << std::endl;
 }
 
+// `hash` is the canonical hash (Natives.h, Lua); NativeTable translates it to
+// the running build and walks the plain or obfuscated registration table.
 ScriptEngine::NativeHandler ScriptEngine::GetNativeHandler(uint64_t hash)
 {
-	NativeRegistration * table = registrationTable[hash & 0xFF];
-	for (; table; table = table->nextRegistration)
-		for (uint32_t i = 0; i < table->numEntries; i++)
-			if (hash == table->hashes[i]) 
-				return table->handlers[i];
-	return nullptr;
+	return NativeTable::Lookup(hash);
 }

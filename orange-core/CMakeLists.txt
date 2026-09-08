@@ -7,6 +7,7 @@ set(ORANGE_CORE_SOURCES
   Core/Chat.cpp
   Core/Commands.cpp
   Core/nativeInvoker.cpp
+  Core/NativeTable.cpp
   Core/scrEngine.cpp
   Core/Script.cpp
   Core/ScriptInvoker.cpp
