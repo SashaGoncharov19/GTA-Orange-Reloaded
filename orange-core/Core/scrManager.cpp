@@ -50,22 +50,58 @@ void Script::Yield(uint32_t time)
 // The game has booted once its own scripts took the loading screen down and
 // the player is in the world. Read through natives from the script thread,
 // which is the one place they are meant to be called from.
+//
+// Every probe value is logged now and then, because on a new game build the
+// first question is whether natives execute at all: GET_FRAME_COUNT must be
+// non-zero and growing and PLAYER_PED_ID non-zero, otherwise the invocation
+// (context layout, handler lookup, crossmap) is broken and taking over would
+// only freeze the game's own scripts for nothing.
 static bool GameHasBooted()
 {
 	static unsigned ticks = 0;
+	static int lastFrame = 0;
+	static bool nativesReported = false;
 	++ticks;
 	bool loading = DLC2::GET_IS_LOADING_SCREEN_ACTIVE() != 0;
-	bool playing = PLAYER::IS_PLAYER_PLAYING(PLAYER::PLAYER_ID()) != 0;
-	if (!loading && playing)
-		return true;
-	if (ticks == 1 || ticks % 900 == 0)
+	int player = PLAYER::PLAYER_ID();
+	int ped = PLAYER::PLAYER_PED_ID();
+	bool playing = PLAYER::IS_PLAYER_PLAYING(player) != 0;
+	int frame = GAMEPLAY::GET_FRAME_COUNT();
+	bool pedExists = ped != 0 && ENTITY::DOES_ENTITY_EXIST(ped) != 0;
+	int health = pedExists ? ENTITY::GET_ENTITY_HEALTH(ped) : 0;
+	bool nativesAlive = frame != 0 && (frame != lastFrame || ticks == 1) && ped != 0;
+
+	if (ticks == 1 || ticks % 900 == 0 || (nativesAlive && !nativesReported))
+	{
 		log_info << "Script thread: waiting for the game to boot (loading screen " << (loading ? "active" : "gone")
-			<< ", player " << (playing ? "playing" : "not playing yet") << ", tick " << ticks << ")" << std::endl;
+			<< ", player " << (playing ? "playing" : "not playing yet") << ", tick " << ticks << ") - natives: PLAYER_ID=" << player
+			<< " PLAYER_PED_ID=" << ped << " DOES_ENTITY_EXIST=" << (pedExists ? 1 : 0) << " GET_ENTITY_HEALTH=" << health
+			<< " GET_FRAME_COUNT=" << frame << (nativesAlive ? " (natives execute)" : " (natives return nothing yet)") << std::endl;
+		if (nativesAlive && !nativesReported)
+		{
+			nativesReported = true;
+			log_info << "Natives: the game executes them on this build (frame counter and player ped answer)" << std::endl;
+		}
+		if (!nativesAlive && ticks >= 1800)
+			log_error << "Natives: still no answer after " << ticks << " ticks; the calls reach the handlers but nothing comes back. "
+				"Check the natives-<version>.txt translations and the call context layout (Core/nativeInvoker.h)" << std::endl;
+	}
+	lastFrame = frame;
+
+	// The loading screen is down and the player is in the world: either the
+	// game says so, or (IS_PLAYER_PLAYING answered no while the ped is there,
+	// seen on 1.0.3889.0 when injected into a running story mode) the ped
+	// exists and is alive.
+	if (!loading && nativesAlive && (playing || (pedExists && health > 0)))
+		return true;
 	return false;
 }
 
 void ScriptManagerThread::DoRun()
 {
+	// For the render thread (D3DHook::Render), which must not call natives.
+	CGlobals::Get().pauseMenuActive = UI::IS_PAUSE_MENU_ACTIVE() != 0 || UI::_0xE18B138FABC53103() != 0;
+
 	if (!ScriptEngine::TookOver())
 	{
 		if (!GameHasBooted())
