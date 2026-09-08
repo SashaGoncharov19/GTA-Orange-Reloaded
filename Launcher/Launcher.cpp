@@ -87,6 +87,7 @@ struct LaunchOptions
 	bool forceDirect = false;
 	int timeoutSeconds = 600;
 	std::wstring gameDir;
+	bool dumpGame = false;        // --dump-game: write the unpacked GTA5.exe image to disk and exit
 };
 static LaunchOptions g_options;
 
@@ -101,6 +102,7 @@ static void ShowUsage()
 		L"  --direct            start GTA5.exe directly\n"
 		L"  --no-unpack-wait    do not wait for the executable to be unpacked before injecting\n"
 		L"  --timeout <sec>     how long to wait for GTA5.exe (default 600)\n"
+		L"  --dump-game         write the unpacked GTA5.exe image (for IDA / Ghidra) next to the launcher and exit\n"
 		L"  --no-update         skip the update check\n"
 		L"  --update            force an update check (even for development builds)\n"
 		L"  --channel <name>    update channel: stable (default) or nightly\n"
@@ -131,6 +133,8 @@ static bool ParseCommandLine(LaunchOptions& options)
 			options.gameDir = argv[++i];
 		else if (arg == L"--timeout" && i + 1 < argc)
 			options.timeoutSeconds = _wtoi(argv[++i]);
+		else if (arg == L"--dump-game")
+			options.dumpGame = true;
 		else if (arg == L"--no-update")
 			options.checkUpdates = false;
 		else if (arg == L"--update")
@@ -296,7 +300,7 @@ void LaunchGame()
 		LauncherLog("---- Launcher " ORANGE_VERSION " starting ----");
 		LauncherLog(L"launcher folder: " + orangeDir);
 		LauncherLog(L"command line: " + std::wstring(GetCommandLineW()));
-		LauncherLog("mode: " + std::string(g_options.injectOnly ? "inject into a running GTA5.exe (--inject)" : "start the game and inject")
+		LauncherLog("mode: " + std::string(g_options.dumpGame ? "dump the unpacked GTA5.exe image (--dump-game)" : g_options.injectOnly ? "inject into a running GTA5.exe (--inject)" : "start the game and inject")
 			+ ", wait for unpack: " + BoolText(g_options.waitForUnpack)
 			+ ", timeout: " + std::to_string(g_options.timeoutSeconds) + "s"
 			+ ", update check: " + BoolText(g_options.checkUpdates && !g_options.afterUpdate));
@@ -432,6 +436,21 @@ void LaunchGame()
 		LauncherLog("waiting for GTA5.exe (up to " + std::to_string(g_options.timeoutSeconds) + "s)");
 		if (!Injector::Get().WaitUntilGameStarts(g_options.timeoutSeconds))
 			Fail(L"Timed out waiting for GTA5.exe to start");
+		if (g_options.dumpGame)
+		{
+			SetSplashStatus(L"Dumping GTA5.exe from memory...");
+			LauncherLog("dumping the unpacked GTA5.exe image from memory (--dump-game)");
+			std::wstring written;
+			std::string error;
+			if (Injector::Get().DumpGame(orangeDir, written, error))
+			{
+				MessageBoxW(NULL, (L"GTA5.exe was dumped from memory to\n" + written +
+					L"\n\nOpen it in IDA / Ghidra to look for offsets (docs/UPDATING_OFFSETS.md).").c_str(),
+					L"GTA:Orange Launcher", MB_OK | MB_ICONINFORMATION);
+				TerminateProcess(GetCurrentProcess(), 0);
+			}
+			Fail((L"Dumping GTA5.exe failed:\n" + FromUtf8(error.c_str())).c_str());
+		}
 		SetSplashStatus(L"Injecting orange-core.dll...");
 		// A game we attach to (--inject) has been running for a while and is
 		// unpacked long ago; keep the wait short there, the full 2 minutes

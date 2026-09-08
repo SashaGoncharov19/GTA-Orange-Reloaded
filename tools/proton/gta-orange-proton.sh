@@ -26,6 +26,8 @@
 #   --timeout SEC      how long to wait for GTA5.exe (default 600)
 #   --logs             only print the log files of the last run and exit
 #   --no-log-tail      do not print the logs after the launcher exits
+#   --dump-game        passed to Launcher.exe: write the unpacked GTA5.exe
+#                      image (for IDA / Ghidra) next to this script, no inject
 #   -h, --help         show this help
 #
 # Environment overrides: ORANGE_CLIENT_DIR, STEAM_ROOT, PROTON_DIR, GTA_APPID

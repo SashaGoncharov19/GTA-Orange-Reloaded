@@ -32,6 +32,9 @@ public:
 	bool WaitUntilGameStarts(int timeoutSeconds);
 	// Injects all pushed libraries into the running GTA5.exe. Returns false on failure.
 	bool InjectAll(bool waitForUnpack = true, int unpackTimeoutSeconds = 120);
+	// Writes the in-memory (unpacked) image of GTA5.exe to <outputDir>\GTA5-<version>.dump.exe
+	// as a PE that IDA / Ghidra can open. Returns false with an explanation on failure.
+	bool DumpGame(const std::wstring& outputDir, std::wstring& writtenPath, std::string& error);
 	void PushLibrary(std::string path);
 
 
