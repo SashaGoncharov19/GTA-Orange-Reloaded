@@ -11,6 +11,8 @@
 #         Launcher.exe --inject
 #      inside the very same Proton prefix, which injects orange-core.dll into
 #      the running game
+#   4. when the launcher exits, shows the tail of launcher.log and client.log
+#      and tells you whether orange-core activated inside the game
 #
 # Usage:
 #   ./gta-orange-proton.sh [options] [-- extra Launcher.exe options]
@@ -22,9 +24,21 @@
 #                      configured for GTA V, read from compatdata/config_info)
 #   --no-launch        do not start the game, only wait for GTA5.exe and inject
 #   --timeout SEC      how long to wait for GTA5.exe (default 600)
+#   --logs             only print the log files of the last run and exit
+#   --no-log-tail      do not print the logs after the launcher exits
 #   -h, --help         show this help
 #
 # Environment overrides: ORANGE_CLIENT_DIR, STEAM_ROOT, PROTON_DIR, GTA_APPID
+#
+# Logs:
+#   <client dir>/launcher.log   every step of the launcher (update check,
+#                               waiting for GTA5.exe, injection result)
+#   <client dir>/client.log     what orange-core.dll does inside the game
+#                               (game version, offsets, hooks, network)
+#   PROTON_LOG=1 ./gta-orange-proton.sh   additionally writes Wine's output
+#                               for the launcher to ~/steam-271590.log; set
+#                               "PROTON_LOG=1 %command%" as the game's Steam
+#                               launch option to get the same for GTA5.exe
 #
 # Alternative without this script (needs protontricks):
 #   protontricks-launch --appid 271590 /path/to/Launcher.exe --inject
@@ -37,9 +51,11 @@ PROTON_DIR="${PROTON_DIR:-}"
 STEAM_ROOT="${STEAM_ROOT:-}"
 TIMEOUT=600
 LAUNCH=1
+LOG_TAIL=1
+LOGS_ONLY=0
 EXTRA_ARGS=()
 
-usage() { sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,45p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 log() { printf '[gta-orange] %s\n' "$*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
 
@@ -49,11 +65,56 @@ while [ $# -gt 0 ]; do
 		--proton) PROTON_DIR="$2"; shift 2 ;;
 		--no-launch) LAUNCH=0; shift ;;
 		--timeout) TIMEOUT="$2"; shift 2 ;;
+		--logs) LOGS_ONLY=1; shift ;;
+		--no-log-tail) LOG_TAIL=0; shift ;;
 		-h|--help) usage; exit 0 ;;
 		--) shift; EXTRA_ARGS+=("$@"); break ;;
 		*) EXTRA_ARGS+=("$1"); shift ;;
 	esac
 done
+
+LAUNCHER_LOG="$CLIENT_DIR/launcher.log"
+CLIENT_LOG="$CLIENT_DIR/client.log"
+
+# --- log helpers --------------------------------------------------------------
+show_log() {
+	local file="$1" lines="${2:-25}"
+	echo "----- $file (last $lines lines) -----" >&2
+	if [ -f "$file" ]; then
+		tail -n "$lines" "$file" >&2
+	else
+		echo "(not written yet)" >&2
+	fi
+}
+
+# Reads client.log and explains the outcome of the last injection.
+summarize_client_log() {
+	[ -f "$CLIENT_LOG" ] || { log "client.log was not written: orange-core.dll did not load inside GTA5.exe (see launcher.log)"; return; }
+	local version
+	version="$(grep -a 'Game version:' "$CLIENT_LOG" | tail -n 1 | sed -E 's/.*Game version: ([^,]+),.*/\1/')"
+	[ -n "$version" ] && log "GTA5.exe version seen by orange-core: $version"
+	if grep -aq 'Game patches applied' "$CLIENT_LOG" && [ "$(grep -ac 'Game patches applied' "$CLIENT_LOG")" -ge 1 ]; then
+		if tail -n 200 "$CLIENT_LOG" | grep -aq 'stays inactive'; then
+			:
+		else
+			log "orange-core is ACTIVE in the game (patches applied)."
+		fi
+	fi
+	if tail -n 200 "$CLIENT_LOG" | grep -aq 'stays inactive'; then
+		log "orange-core stayed INACTIVE: this GTA V build is not supported by the built-in offsets."
+		local template
+		template="$(ls -t "$CLIENT_DIR"/offsets-*.generated.ini 2>/dev/null | head -n 1 || true)"
+		[ -n "$template" ] && log "A template with the missing offsets was written to: $template"
+		log "See docs/UPDATING_OFFSETS.md (in the repository) for how to fill in offsets.ini."
+	fi
+}
+
+if [ "$LOGS_ONLY" = 1 ]; then
+	show_log "$LAUNCHER_LOG" 40
+	show_log "$CLIENT_LOG" 60
+	summarize_client_log
+	exit 0
+fi
 
 [ -f "$CLIENT_DIR/Launcher.exe" ] || die "Launcher.exe not found in '$CLIENT_DIR' (use --client-dir)"
 [ -f "$CLIENT_DIR/orange-core.dll" ] || die "orange-core.dll not found in '$CLIENT_DIR'"
@@ -105,7 +166,10 @@ if [ -z "$PROTON_DIR" ] && [ -f "$COMPAT_DATA/config_info" ]; then
 	PROTON_DIR="${PROTON_DIR%/files}"
 fi
 [ -n "$PROTON_DIR" ] && [ -x "$PROTON_DIR/proton" ] || die "Proton not found (looked at '${PROTON_DIR:-<unset>}'). Pass --proton /path/to/Proton"
-log "Proton: $PROTON_DIR"
+log "Proton: $PROTON_DIR ($(sed -n 1p "$COMPAT_DATA/config_info" 2>/dev/null || echo 'version unknown'))"
+log "Client: $CLIENT_DIR"
+log "Logs:   $LAUNCHER_LOG"
+log "        $CLIENT_LOG"
 
 # --- start the game -----------------------------------------------------------
 game_running() { pgrep -f '[G]TA5\.exe' >/dev/null 2>&1; }
@@ -128,10 +192,29 @@ until game_running; do
 	waited=$((waited + 2))
 	[ "$waited" -ge "$TIMEOUT" ] && die "Timed out waiting for GTA5.exe"
 done
-log "GTA5.exe is running, injecting orange-core.dll"
+log "GTA5.exe is running, injecting orange-core.dll (follow along with: tail -f '$LAUNCHER_LOG')"
 
 # --- inject inside the same prefix --------------------------------------------
 export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_ROOT"
 export STEAM_COMPAT_DATA_PATH="$COMPAT_DATA"
 cd "$CLIENT_DIR"
-exec "$PROTON_DIR/proton" run "$CLIENT_DIR/Launcher.exe" --inject --timeout "$TIMEOUT" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+set +e
+"$PROTON_DIR/proton" run "$CLIENT_DIR/Launcher.exe" --inject --timeout "$TIMEOUT" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+status=$?
+set -e
+
+if [ "$status" -eq 0 ]; then
+	log "Launcher.exe finished (exit code 0)"
+else
+	log "Launcher.exe exited with code $status"
+fi
+
+if [ "$LOG_TAIL" = 1 ]; then
+	# orange-core writes client.log from inside the game a moment after injection.
+	sleep 3
+	show_log "$LAUNCHER_LOG" 25
+	show_log "$CLIENT_LOG" 40
+	summarize_client_log
+	log "Re-print the logs any time with: $0 --logs"
+fi
+exit "$status"

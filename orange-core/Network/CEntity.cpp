@@ -133,12 +133,20 @@ void CEntity::DisableCollision(const CEntity &entity)
 
 uintptr_t CEntity::GetAddress()
 {
+	if (!_entityAddressFunc)
+		return 0;
 	return _entityAddressFunc(Handle);
 }
 
 void CEntity::InitOffsetFunc()
 {
-	uintptr_t address = CMemory((uintptr_t)GetModuleHandle(NULL) + 0xA29ECE)();
+	uintptr_t address = GameOffsets::Address("GetEntityAddressCall");
+	if (!address)
+	{
+		log_error << "CEntity: GetEntityAddressCall unresolved, entity addresses unavailable" << std::endl;
+		_entityAddressFunc = nullptr;
+		return;
+	}
 	_entityAddressFunc = reinterpret_cast<GetEntityOffsetFunc>(*reinterpret_cast<int *>(address + 3) + address + 7);
 }
 

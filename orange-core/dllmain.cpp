@@ -42,10 +42,12 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 		if (!PreLoadPatches())
 		{
 			log_error << "Game build check failed, GTA:Orange stays inactive" << std::endl;
-			MessageBoxA(NULL,
-				"This GTA V build is not supported by this orange-core.dll.\n"
-				"GTA:Orange stays inactive. See client.log next to the DLL for details.",
-				"GTA:Orange", MB_OK | MB_ICONERROR);
+			std::string message =
+				"This GTA V build (version " + GameOffsets::GameVersion() + ") is not supported by this orange-core.dll:\n"
+				+ std::to_string(GameOffsets::UnresolvedRequired().size()) + " required game offset(s) are unknown.\n\n"
+				"GTA:Orange stays inactive. See client.log and offsets-" + GameOffsets::GameVersion() + ".generated.ini\n"
+				"next to the DLL, and docs/UPDATING_OFFSETS.md for how to add the offsets.";
+			MessageBoxA(NULL, message.c_str(), "GTA:Orange", MB_OK | MB_ICONERROR);
 		}
 		break;
 	}

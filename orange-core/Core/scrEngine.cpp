@@ -23,15 +23,21 @@ static eGameState * gameState;
 bool ScriptEngine::Initialize()
 {
 	log_info << "Initializing ScriptEngine..." << std::endl;
-	auto scrThreadCollectionPattern = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x9DF33F) + 8;
-	auto activeThreadTlsOffsetPattern = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x14AE8ED) - 4;
-	auto scrThreadIdPattern = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x30A9E04) + 7;
-	auto scrThreadCountPattern = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x14AFE13);
-	auto registrationTablePattern = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x14B1A4F) + 6;
-	auto g_scriptHandlerMgrPattern = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x9ED21A) + 10;
-	auto getScriptIdBlock = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x14B4CCA);
+	// All addresses come from GameOffsets (offsets.ini / reference build / pattern scan).
+	auto scrThreadCollectionPattern = GameMem("ScrThreadCollection");
+	auto activeThreadTlsOffsetPattern = GameMem("ActiveThreadTlsOffset");
+	auto scrThreadIdPattern = GameMem("ScrThreadId");
+	auto scrThreadCountPattern = GameMem("ScrThreadCount");
+	auto registrationTablePattern = GameMem("RegistrationTable");
+	auto g_scriptHandlerMgrPattern = GameMem("ScriptHandlerMgr");
+	auto getScriptIdBlock = GameMem("GetScriptIdBlock");
 
 	scrThreadCollection = reinterpret_cast<decltype(scrThreadCollection)>(scrThreadCollectionPattern.getOffset());
+	if (scrThreadCollection == nullptr)
+	{
+		log_error << "Unable to find scrThreadCollection" << std::endl;
+		return false;
+	}
 	log_debug << "scrThreadCollection\t " << std::hex << scrThreadCollection << std::endl;
 
 	uint32_t * tlsLoc = activeThreadTlsOffsetPattern.get<uint32_t>(0);
@@ -45,12 +51,27 @@ bool ScriptEngine::Initialize()
 
 	// Get thread id
 	scrThreadId = reinterpret_cast<decltype(scrThreadId)>(scrThreadIdPattern.getOffset(2));
+	if (scrThreadId == nullptr)
+	{
+		log_error << "Unable to find scrThreadId" << std::endl;
+		return false;
+	}
 	log_debug << "scrThreadId\t\t " << std::hex << scrThreadId << std::endl;
 
 	scrThreadCount = reinterpret_cast<decltype(scrThreadCount)>(scrThreadCountPattern.getOffset(2));
+	if (scrThreadCount == nullptr)
+	{
+		log_error << "Unable to find scrThreadCount" << std::endl;
+		return false;
+	}
 	log_debug << "scrThreadCount\t " << std::hex << scrThreadCount << std::endl;
 
 	registrationTable = reinterpret_cast<decltype(registrationTable)>(registrationTablePattern.getOffset());
+	if (registrationTable == nullptr)
+	{
+		log_error << "Unable to find registrationTable" << std::endl;
+		return false;
+	}
 	log_debug << "registrationTable\t " << std::hex << registrationTable << std::endl;
 
 	g_scriptHandlerMgr = reinterpret_cast<decltype(g_scriptHandlerMgr)>(g_scriptHandlerMgrPattern.getOffset());

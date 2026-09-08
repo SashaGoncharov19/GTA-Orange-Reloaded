@@ -10,7 +10,10 @@ namespace rageGlobals
 {
 	void SetPlayerColor(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 	{
-		unsigned char * colorAddress = (unsigned char *)((ULONGLONG)CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1E5C90).getOffset(2) + 4);
+		LPVOID colorGlobal = GameMem("PlayerColor").getOffset(2);
+		if (!colorGlobal)
+			return;
+		unsigned char * colorAddress = (unsigned char *)((ULONGLONG)colorGlobal + 4);
 		for (int i = 0; i < 4; ++i)
 		{
 			(*colorAddress++) = b;
@@ -45,7 +48,8 @@ namespace GTA
 
 	CViewportGame *CViewportGame::Get()
 	{
-		return *(CViewportGame**)(CMemory((uintptr_t)GetModuleHandle(NULL) + 0xA27578).getOffset());
+		LPVOID viewport = GameMem("ViewportGame").getOffset();
+		return viewport ? *(CViewportGame**)viewport : nullptr;
 	}
 
 };
@@ -61,15 +65,17 @@ GTA::CTask * CTaskTree::GetTaskByID(unsigned int taskID)
 CPed * CPed::GetFromScriptID(int Handle)
 {
 	typedef CPed*(*GetCEntity)(int);
-	return (CPed*)((GetCEntity)CMemory((uintptr_t)GetModuleHandle(NULL) + 0x15013C)())(Handle);
+	static GetCEntity getEntity = GameFunc<GetCEntity>("GetEntityFromScriptHandle");
+	return getEntity ? (CPed*)getEntity(Handle) : nullptr;
 }
 
 CWorld *CWorld::Get()
 {
-	return *((CWorld**)CMemory((uintptr_t)GetModuleHandle(NULL) + 0x89E04D).getOffset());
+	LPVOID world = GameMem("World").getOffset();
+	return world ? *(CWorld**)world : nullptr;
 }
 
 CVehicleFactory* CVehicleFactory::Get()
 {
-	return (CVehicleFactory*)CMemory((uintptr_t)GetModuleHandle(NULL) + 0xE43BF4).getOffset();
+	return (CVehicleFactory*)GameMem("VehicleFactory").getOffset();
 }

@@ -1,6 +1,12 @@
 #include "stdafx.h"
+#include "LauncherLog.h"
 
 Injector * Injector::instance = nullptr;
+
+static std::string LastErrorText()
+{
+	return "error " + std::to_string(GetLastError());
+}
 
 Injector::Injector()
 {
@@ -15,7 +21,8 @@ void Injector::Run(std::wstring folder, std::wstring pePath)
 	memset(&piProcessInfo, 0, sizeof(piProcessInfo));
 	siStartupInfo.cb = sizeof(siStartupInfo);
 	if (!CreateProcess(pePath.c_str(), Params, NULL, NULL, true, CREATE_SUSPENDED, NULL, folder.c_str(), &siStartupInfo, &piProcessInfo))
-		throw std::runtime_error("Can't start executable");
+		throw std::runtime_error("Can't start GTA5.exe (" + LastErrorText() + ")");
+	LauncherLog("GTA5.exe started, pid " + std::to_string(piProcessInfo.dwProcessId));
 	ResumeThread(piProcessInfo.hThread);
 	CloseHandle(piProcessInfo.hThread);
 	CloseHandle(piProcessInfo.hProcess);
@@ -32,20 +39,33 @@ bool Injector::InjectAll(bool waitForUnpack, int unpackTimeoutSeconds)
 	int pid = FindProcess(PROCESS_NAME);
 	if (pid == -1)
 	{
+		LauncherLog("inject: GTA5.exe is not running");
 		MessageBox(NULL, L"GTA5.exe is not running", L"GTA:Orange Launcher", MB_OK | MB_ICONERROR);
 		return false;
 	}
+	LauncherLog("inject: GTA5.exe pid " + std::to_string(pid));
 	if (waitForUnpack)
-		WaitForUnpackFinished(pid, unpackTimeoutSeconds);
+	{
+		LauncherLog("inject: waiting for the executable to be unpacked (up to " + std::to_string(unpackTimeoutSeconds) + "s)");
+		if (WaitForUnpackFinished(pid, unpackTimeoutSeconds))
+			LauncherLog("inject: code section changed, executable unpacked");
+		else
+			LauncherLog("inject: unpack wait timed out or the process could not be read, injecting anyway");
+	}
+	else
+		LauncherLog("inject: not waiting for unpack");
 	for (const std::string& lib : libs)
 	{
 		std::string error;
+		LauncherLog("inject: loading " + lib);
 		if (!Inject(pid, lib, error))
 		{
-			std::string message = "Failed to inject " + lib + "\n" + error;
+			LauncherLog("inject: FAILED: " + error);
+			std::string message = "Failed to inject " + lib + "\n" + error + "\n\nSee launcher.log and client.log next to Launcher.exe.";
 			MessageBoxA(NULL, message.c_str(), "GTA:Orange Launcher", MB_OK | MB_ICONERROR);
 			return false;
 		}
+		LauncherLog("inject: " + lib + " loaded");
 	}
 	Injected = true;
 	return true;
@@ -91,12 +111,17 @@ GameVersion Injector::GetGameVersion()
 bool Injector::WaitUntilGameStarts(int timeoutSeconds)
 {
 	ULONGLONG deadline = GetTickCount64() + (ULONGLONG)timeoutSeconds * 1000ULL;
-	while (FindProcess(PROCESS_NAME) == -1)
+	int pid;
+	while ((pid = FindProcess(PROCESS_NAME)) == -1)
 	{
 		if (timeoutSeconds > 0 && GetTickCount64() > deadline)
+		{
+			LauncherLog("GTA5.exe did not show up within " + std::to_string(timeoutSeconds) + "s");
 			return false;
+		}
 		Sleep(250);
 	}
+	LauncherLog("GTA5.exe is running, pid " + std::to_string(pid));
 	return true;
 }
 
@@ -136,9 +161,12 @@ bool Injector::Inject(int processId, std::string dllName, std::string& error)
 	{
 		// LoadLibraryA returned NULL inside the game: missing dependency, wrong
 		// architecture or the DLL refused to load (see client.log).
-		error = "LoadLibrary failed inside the game process";
+		error = "LoadLibrary failed inside the game process (missing dependency or the DLL refused to load; check client.log)";
 		return false;
 	}
+	char handleText[32];
+	snprintf(handleText, sizeof(handleText), "0x%lX", (unsigned long)exitCode);
+	LauncherLog(std::string("inject: LoadLibrary returned ") + handleText + " (module handle, truncated to 32 bits)");
 	return true;
 }
 
@@ -148,7 +176,10 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 {
 	HANDLE process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
 	if (!process)
+	{
+		LauncherLog("unpack wait: OpenProcess failed (" + LastErrorText() + ")");
 		return false;
+	}
 
 	ULONGLONG deadline = GetTickCount64() + (ULONGLONG)timeoutSeconds * 1000ULL;
 	HMODULE hMod = NULL;
@@ -175,6 +206,7 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 		{
 			if (GetTickCount64() > deadline)
 			{
+				LauncherLog("unpack wait: GTA5.exe module not found in the process within the timeout");
 				CloseHandle(process);
 				return false;
 			}
@@ -199,6 +231,7 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 		}
 		if (GetTickCount64() > deadline)
 		{
+			LauncherLog("unpack wait: code section did not change within the timeout");
 			CloseHandle(process);
 			return false;
 		}

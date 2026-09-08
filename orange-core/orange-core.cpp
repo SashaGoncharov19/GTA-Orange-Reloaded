@@ -1,53 +1,71 @@
 #include "stdafx.h"
 
+// Every GTA5.exe address used below comes from GameOffsets (GameOffsets.cpp),
+// looked up by name. GameMem("Name") returns an inert CMemory (address 0,
+// writes skipped) when the entry is unresolved on the running game build, so
+// the optional patches simply do nothing there. Required entries are checked
+// once in PreLoadPatches() before anything is touched.
+
 bool ScriptsDisabled = false;
 
 void ForceToSingle()
 {
-	CMemory mem((uintptr_t)GetModuleHandle(NULL) + 0x2773C); //48 83 EC 28 85 D2 78 71 75 0F
-	CMemory mem2((uintptr_t)GetModuleHandle(NULL) + 0x186680); //48 83 EC 28 B9 ? ? ? ? E8 ? ? ? ? B9 ? ? ? ? E8 ? ? ? ? B1 01
+	CMemory mem = GameMem("ForceToSingle");
+	CMemory mem2 = GameMem("ForceToSingle_2");
+	if (!mem.valid() || !mem2.valid())
+	{
+		log_error << "ForceToSingle skipped: offsets unresolved" << std::endl;
+		return;
+	}
+	// The rel32 of the call/jmp at +0x3A is pointed at ForceToSingle_2.
 	(mem + 0x3B).put(DWORD(mem2() - mem() - 0x3F));
 }
 
 void UnknownPatches()
 {
-	CMemory mem((uintptr_t)GetModuleHandle(NULL) + 0x1B348B); //48 85 C9 0F 84 ? 00 00 00 48 8D 55 A7 E8
-	auto mem2 = mem + 13;
-	mem2.put(0x01B0i16);
-	mem2.nop(3);
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1AE3A0).nop(5); //E8 ? ? ? ? 8B CB 40 88 2D ? ? ? ?
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1E6EF8).retn(); //48 89 5C 24 ? 57 48 83 EC 20 8B F9 8B DA
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x11CD8C4).retn();
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x11D03D0).retn();
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1C220E).nop(9);
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0xF8A528).retn();
-	(CMemory((uintptr_t)GetModuleHandle(NULL) + 0x11D986C) - 4).retn();
+	CMemory mem = GameMem("UnknownPatch_1");
+	if (mem.valid())
+	{
+		CMemory mem2 = mem + 13;
+		mem2.put(0x01B0i16);   // mov al, 1
+		mem2.nop(3);
+	}
+	GameMem("UnknownPatch_2").nop(5);
+	GameMem("UnknownPatch_3").retn();
+	GameMem("UnknownPatch_4").retn();
+	GameMem("UnknownPatch_5").retn();
+	GameMem("UnknownPatch_6").nop(9);
+	GameMem("UnknownPatch_7").retn();
+	GameMem("UnknownPatch_8").retn();
 
-	mem = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x23AD9C); //HECK_MULTIPLAYER_BYTE_DRAW_MAP_FRAME
-	mem2 = CMemory(mem);
-	mem.nop(7);
-	mem2.put(0xB640i16);
-	mem2.put(0x01i8);
+	mem = GameMem("CheckMultiplayerByteDrawMapFrame");
+	if (mem.valid())
+	{
+		CMemory mem2 = CMemory(mem);
+		mem.nop(7);
+		mem2.put(0xB640i16);   // mov sil, 1
+		mem2.put(0x01i8);
+	}
 
-	(CMemory((uintptr_t)GetModuleHandle(NULL) + 0x141A3) + 2).put(0x08i8);
-	(CMemory((uintptr_t)GetModuleHandle(NULL) + 0xA64CA6) - 74).retn();
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1AE3A0).nop(5);
+	GameMem("UnknownPatch_9").put(0x08i8);
+	GameMem("UnknownPatch_10").retn();
 }
 
 void DefineNatives()
 {
-	CGlobals::Get().ForceCleanupForAllThreadsWithThisName = 
-		(ForceCleanupForAllThreadsWithThisName_)((uintptr_t)GetModuleHandle(NULL) + 0xC70970); //FORCE_CLEANUP_FOR_ALL_THREADS_WITH_THIS_NAME
-	CGlobals::Get().TerminateAllScriptsWithThisName = 
-		(TerminateAllScriptsWithThisName_)((uintptr_t)GetModuleHandle(NULL) + 0xA3DAE8); //TerminateAllScriptsWithThisName
-	CGlobals::Get().ShutdownLoadingScreen = 
-		(ShutdownLoadingScreen_)((uintptr_t)GetModuleHandle(NULL) + 0x1FBD34); //ShutdownLoadingScreen
-	CGlobals::Get().DoScreenFadeIn = 
-		(DoScreenFadeIn_)((uintptr_t)GetModuleHandle(NULL) + 0x2A1554); //DoScreenFadeIn
-	CGlobals::Get().HasScriptLoaded = 
-		(HasScriptLoaded_)((uintptr_t)GetModuleHandle(NULL) + 0xCE37E0); //HasScriptLoaded
-	CGlobals::Get().canLangChange = (bool*)((uintptr_t)CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1C183F).getOffset(2) + 1);
-	CGlobals::Get().InitializeOnline = (InitializeOnline_)((uintptr_t)GetModuleHandle(NULL) + 0x103708);
+	CGlobals::Get().ForceCleanupForAllThreadsWithThisName =
+		GameFunc<ForceCleanupForAllThreadsWithThisName_>("ForceCleanupForAllThreadsWithThisName");
+	CGlobals::Get().TerminateAllScriptsWithThisName =
+		GameFunc<TerminateAllScriptsWithThisName_>("TerminateAllScriptsWithThisName");
+	CGlobals::Get().ShutdownLoadingScreen = GameFunc<ShutdownLoadingScreen_>("ShutdownLoadingScreen");
+	CGlobals::Get().DoScreenFadeIn = GameFunc<DoScreenFadeIn_>("DoScreenFadeIn");
+	CGlobals::Get().HasScriptLoaded = GameFunc<HasScriptLoaded_>("HasScriptLoaded");
+	CGlobals::Get().InitializeOnline = GameFunc<InitializeOnline_>("InitializeOnline");
+
+	// The flag lives one byte after the global referenced by the instruction.
+	static bool fallbackCanLangChange = false;
+	LPVOID langGlobal = GameMem("CanLangChange").getOffset(2);
+	CGlobals::Get().canLangChange = langGlobal ? (bool*)((uintptr_t)langGlobal + 1) : &fallbackCanLangChange;
 }
 
 static bool OnLookAlive()
@@ -56,14 +74,18 @@ static bool OnLookAlive()
 	if (!HUDInited)
 	{
 		typedef void(*InitHUD)(void);
-		InitHUD(CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1F358F)() - 0x23)();
+		InitHUD initHud = GameFunc<InitHUD>("InitHUD");
+		if (initHud)
+			initHud();
 		HUDInited = true;
 	}
 	if (!IsScriptsDisabled() && IsAnyScriptLoaded())
 	{
 		DisableScripts();
-		CGlobals::Get().ShutdownLoadingScreen();
-		CGlobals::Get().DoScreenFadeIn(0);
+		if (CGlobals::Get().ShutdownLoadingScreen)
+			CGlobals::Get().ShutdownLoadingScreen();
+		if (CGlobals::Get().DoScreenFadeIn)
+			CGlobals::Get().DoScreenFadeIn(0);
 	}
 	//OnGameFrame
 	return g_origLookAlive();
@@ -106,7 +128,8 @@ void OnGameStateChange(int gameState)
 		//TurnOnConsole();
 		if (!ScriptEngine::Initialize())
 			log_error << "Failed to initialize ScriptEngine" << std::endl;
-		D3DHook::HookD3D11();
+		if (!D3DHook::HookD3D11())
+			log_error << "Failed to hook D3D11, the chat and UI will not render" << std::endl;
 		CChat::Get()->RegisterCommandProcessor(CommandProcessor);
 
 		log_info << "Game ready" << std::endl;
@@ -125,7 +148,7 @@ void OnGameStateChange(int gameState)
 		//SyncTree::Init();
 		//log_debug << "CPlayerSyncTree: 0x" << std::hex << SyncTree::GetPlayerSyncTree() << std::endl;
 
-		CMemory((uintptr_t)GetModuleHandle(NULL) + 0x7FFF0C).farJmp(eventHook);
+		GameMem("EventHook").farJmp(eventHook);
 		break;
 	}
 	case GameStateMainMenu:
@@ -167,168 +190,121 @@ DrawTextManager__BeginDisplay_ DrawTextManager__BeginDisplay;
 
 static void BeginDisplayEx(int64_t textMgr, int64_t vp)
 {
-	DrawTextManager__BeginDisplay(textMgr, vp);
-
-	//Тут рендери
+	if (DrawTextManager__BeginDisplay)
+		DrawTextManager__BeginDisplay(textMgr, vp);
 }
 
+// Redirects four call sites of the game through far jumps written into a
+// code cave (unused executable memory inside GTA5.exe), because a 5-byte
+// call cannot reach the DLL directly.
 void HookLoop()
 {
-	auto unusedMem = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x109D5D8);
-	auto callToMem = unusedMem();
-	unusedMem.farJmp(OnLookAlive);
-	auto lookFrame = (CMemory((uintptr_t)GetModuleHandle(NULL) + 0x67A7) + 7);
-	auto lookMem = lookFrame();
-	g_origLookAlive = lookFrame.get_call<LookAlive>();
-	(lookFrame + 1).put(DWORD(callToMem - lookMem - 5));
+	CMemory unusedMem = GameMem("CodeCave");
+	if (!unusedMem.valid())
+	{
+		log_error << "HookLoop: CodeCave unresolved, no game loop hooks installed" << std::endl;
+		return;
+	}
 
-	callToMem = unusedMem();
-	unusedMem.farJmp(gameStateChange_);
-	auto gameStateChange = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1EC8FA); // GameStateChange
-	auto gameStateMem = gameStateChange();
-	g_gameStateChange = gameStateChange.get_call<GameStateChange_>();
-	(gameStateChange + 1).put(DWORD(callToMem - gameStateMem - 5));
+	CMemory lookFrame = GameMem("LookAliveCall");
+	if (lookFrame.valid())
+	{
+		uintptr_t callToMem = unusedMem();
+		unusedMem.farJmp(OnLookAlive);
+		g_origLookAlive = lookFrame.get_call<LookAlive>();
+		(lookFrame + 1).put(DWORD(callToMem - lookFrame() - 5));
+	}
+	else
+		log_error << "HookLoop: LookAliveCall unresolved" << std::endl;
 
-	callToMem = unusedMem();
-	unusedMem.farJmp(CreateWindowExWHook);
-	auto windowCreate = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x12416F7); // WindowCreate
-	auto windowCreateMem = windowCreate();
-	windowCreate.nearCall(DWORD(callToMem - windowCreateMem - 5));
-	windowCreate.nop(1);
+	CMemory gameStateChange = GameMem("GameStateChangeCall");
+	if (gameStateChange.valid())
+	{
+		uintptr_t callToMem = unusedMem();
+		unusedMem.farJmp(gameStateChange_);
+		g_gameStateChange = gameStateChange.get_call<GameStateChange_>();
+		(gameStateChange + 1).put(DWORD(callToMem - gameStateChange() - 5));
+	}
+	else
+		log_error << "HookLoop: GameStateChangeCall unresolved" << std::endl;
 
-	callToMem = unusedMem();
-	unusedMem.farJmp(BeginDisplayEx);
-	auto beginDisplay = CMemory((uintptr_t)GetModuleHandle(NULL) + 0xCF31CB); // BeginDisplay
-	auto beginDisplayMem = beginDisplay();
-	beginDisplay.nearCall(DWORD(callToMem - beginDisplayMem - 5));
+	CMemory windowCreate = GameMem("WindowCreateCall");
+	if (windowCreate.valid())
+	{
+		uintptr_t callToMem = unusedMem();
+		unusedMem.farJmp(CreateWindowExWHook);
+		uintptr_t windowCreateMem = windowCreate();
+		windowCreate.nearCall(DWORD(callToMem - windowCreateMem - 5));
+		windowCreate.nop(1);
+	}
+	else
+		log_error << "HookLoop: WindowCreateCall unresolved" << std::endl;
+
+	CMemory beginDisplay = GameMem("BeginDisplayCall");
+	if (beginDisplay.valid())
+	{
+		uintptr_t callToMem = unusedMem();
+		unusedMem.farJmp(BeginDisplayEx);
+		DrawTextManager__BeginDisplay = beginDisplay.get_call<DrawTextManager__BeginDisplay_>();
+		beginDisplay.nearCall(DWORD(callToMem - beginDisplay() - 5));
+	}
 }
 
 void GameProcessHooks()
 {
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0xC91D39).nop(24);//Objects
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1F5BEC).nop(5); //Esc freeze
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x7B2F6C).retn(); //Cheat console
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x2413D2).nop(6); //UI Wheel slowmo
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x127C8CA).nop(4); //Show cursor
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x127C8DC).nop(4); //Show cursor
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1BCCE8).retn(); //Rockstar loading logo
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1C8E28).retn(); //Tooltips
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x10046F0).retn(); //Social club news
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x62039C).retn(); //Disable wanted generation
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x6194BE).put(0xE990i16); //Disable wanted generation 2
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x11D2BD3).nop(5); //Intentional crash
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0xCCC992).nop(23); //RASH_LOAD_MODELS_TOO_QUICKLY
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x109D5D4).retn(); //REATE_NETWORK_EVENT_BINDINGS
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x597484).retn(); //OAD_NEW_GAME
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0xEE29C8).retn(); //ESET_VEHICLE_DENSITY_LAST_FRAME
-	(*(uint64_t*)CMemory((uintptr_t)GetModuleHandle(NULL) + 0xEE29D7).getOffset(2)) = 0; //AR_VEHICLE_DENSITY
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x5BB16C).retn(); //ET_CLOCK_FORWARD_AFTER_DEATH
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x1788CC).nop(46); //ISABLE_NORTH_BLIP
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0xEE22B8).retn(); //ISABLE_VEHICLE_RESET_AT_SET_POSITION
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x8F6624).retn(); //ISABLE_LOADING_MP_DLC_CONTENT
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x9F69D4).retn(); //UNTIME_EXECUTABLE_IMPORTS_CHECK
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0xE66118).retn(); //ISABLE_POPULATION_VEHICLES_10
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0xEF9670).retn(); //ISABLE_POPULATION_VEHICLES_8
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0xE9BE73).nop(3); //ISABLE_POPULATION_VEHICLES_11
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0xE3CC85).nop(5); //ISABLE_POPULATION_VEHICLES_11
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x442F4C).retn(); //ISABLE_POPULATION_PEDS_1
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x694030).retn(); //ISABLE_POPULATION_PEDS_2
-	CMemory mem((uintptr_t)GetModuleHandle(NULL) + 0x6AC43D); //ISABLE_POPULATION_AMBIENT_PEDS
+	GameMem("ObjectsPatch").nop(24);
+	GameMem("EscFreeze").nop(5);
+	GameMem("CheatConsole").retn();
+	GameMem("UIWheelSlowmo").nop(6);
+	GameMem("ShowCursor_1").nop(4);
+	GameMem("ShowCursor_2").nop(4);
+	GameMem("RockstarLoadingLogo").retn();
+	GameMem("Tooltips").retn();
+	GameMem("SocialClubNews").retn();
+	GameMem("DisableWantedGeneration_1").retn();
+	GameMem("DisableWantedGeneration_2").put(0xE990i16);
+	GameMem("IntentionalCrash").nop(5);
+	GameMem("CrashLoadModelsTooQuickly").nop(23);
+	GameMem("CreateNetworkEventBindings").retn();
+	GameMem("LoadNewGame").retn();
+	GameMem("ResetVehicleDensityLastFrame").retn();
+	uint64_t* vehicleDensity = (uint64_t*)GameMem("VarVehicleDensity").getOffset(2);
+	if (vehicleDensity)
+		*vehicleDensity = 0;
+	GameMem("SetClockForwardAfterDeath").retn();
+	GameMem("DisableNorthBlip").nop(46);
+	GameMem("DisableVehicleResetAtSetPosition").retn();
+	GameMem("DisableLoadingMpDlcContent").retn();
+	GameMem("RuntimeExecutableImportsCheck").retn();
+	GameMem("DisablePopulationVehicles_10").retn();
+	GameMem("DisablePopulationVehicles_8").retn();
+	GameMem("DisablePopulationVehicles_11a").nop(3);
+	GameMem("DisablePopulationVehicles_11b").nop(5);
+	GameMem("DisablePopulationPeds_1").retn();
+	GameMem("DisablePopulationPeds_2").retn();
+	CMemory mem = GameMem("DisablePopulationAmbientPeds");
 	(mem + 6).put(0x0i32);
 	(mem + 16).put(0x0i32);
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x6BF525).nop(20); //ISABLE_POPULATION_PEDS_4
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x5FA314).retn(); //ISABLE_COPS_AND_FIRE_TRUCKS_1
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x33E78C).retn(); //ISABLE_COPS_AND_FIRE_TRUCKS_2
-	CMemory((uintptr_t)GetModuleHandle(NULL) + 0x61F620).retn(); //ISABLE_COPS_AND_FIRE_TRUCKS_3
+	GameMem("DisablePopulationPeds_4").nop(20);
+	GameMem("DisableCopsAndFireTrucks_1").retn();
+	GameMem("DisableCopsAndFireTrucks_2").retn();
+	GameMem("DisableCopsAndFireTrucks_3").retn();
 }
 
-// ---------------------------------------------------------------------------
-// Game build check
-//
-// All hooks and patches above use hard-coded offsets into GTA5.exe that were
-// taken from the game build current in January 2017. Injecting them into any
-// other build would crash the game, so before touching anything we verify a
-// handful of byte signatures (the ones the original authors left next to the
-// offsets) at their expected locations.
-// ---------------------------------------------------------------------------
-struct GameSignature
-{
-	const char* name;
-	uintptr_t offset;
-	const char* pattern;   // "48 83 EC 28 ? ? 75 0F" style, '?' = wildcard
-};
-
-static const GameSignature g_gameSignatures[] = {
-	{ "ForceToSingle",       0x2773C,  "48 83 EC 28 85 D2 78 71 75 0F" },
-	{ "ForceToSingle_2",     0x186680, "48 83 EC 28 B9 ? ? ? ? E8 ? ? ? ? B9 ? ? ? ? E8 ? ? ? ? B1 01" },
-	{ "UnknownPatches_1",    0x1B348B, "48 85 C9 0F 84 ? 00 00 00 48 8D 55 A7 E8" },
-	{ "UnknownPatches_2",    0x1AE3A0, "E8 ? ? ? ? 8B CB 40 88 2D ? ? ? ?" },
-	{ "UnknownPatches_3",    0x1E6EF8, "48 89 5C 24 ? 57 48 83 EC 20 8B F9 8B DA" },
-};
-
-static bool MatchSignature(const BYTE* data, const char* pattern)
-{
-	std::stringstream ss(pattern);
-	std::string token;
-	while (ss >> token)
-	{
-		if (token != "?")
-		{
-			unsigned int value = std::stoul(token, nullptr, 16);
-			if (*data != (BYTE)value)
-				return false;
-		}
-		++data;
-	}
-	return true;
-}
-
-// Structured exception handling must live in a function without objects
-// that need unwinding (MSVC C2712), hence this tiny wrapper.
-static bool SafeMatchSignature(uintptr_t address, const char* pattern)
-{
-	__try
-	{
-		return MatchSignature((const BYTE*)address, pattern);
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-	{
-		return false;
-	}
-}
-
-static bool VerifyGameBuild()
-{
-	uintptr_t base = (uintptr_t)GetModuleHandle(NULL);
-	MODULEINFO info = { 0 };
-	GetModuleInformation(GetCurrentProcess(), GetModuleHandle(NULL), &info, sizeof(info));
-	size_t imageSize = info.SizeOfImage;
-
-	char exePath[MAX_PATH] = { 0 };
-	GetModuleFileNameA(NULL, exePath, MAX_PATH);
-	log_info << "Game executable: " << exePath << " (image size 0x" << std::hex << imageSize << std::dec << ")" << std::endl;
-
-	bool ok = true;
-	for (const GameSignature& sig : g_gameSignatures)
-	{
-		bool match = false;
-		if (sig.offset + 64 < imageSize)
-			match = SafeMatchSignature(base + sig.offset, sig.pattern);
-		if (!match)
-		{
-			log_error << "Signature mismatch: " << sig.name << " at GTA5.exe+0x" << std::hex << sig.offset << std::dec << std::endl;
-			ok = false;
-		}
-	}
-	if (ok)
-		log_info << "Game build check passed" << std::endl;
-	return ok;
-}
-
+// Resolves every game offset for the running GTA5.exe and applies the
+// startup patches. Returns false (and touches nothing) when a required
+// offset is unknown for this game build, unless orange.developer exists.
 bool PreLoadPatches()
 {
-	if (!VerifyGameBuild())
+	if (!GameOffsets::Initialize())
 	{
+		std::vector<std::string> missing = GameOffsets::UnresolvedRequired();
+		std::string list;
+		for (size_t i = 0; i < missing.size(); ++i)
+			list += (i ? ", " : "") + missing[i];
+		log_error << missing.size() << " required offset(s) unknown for game version "
+			<< GameOffsets::GameVersion() << ": " << list << std::endl;
+		log_error << "Fill them in offsets.ini (a template was written next to orange-core.dll), see docs/UPDATING_OFFSETS.md" << std::endl;
 		if (!CGlobals::Get().isDeveloper)
 			return false;
 		log_error << "orange.developer present, applying patches anyway (this will most likely crash the game)" << std::endl;
@@ -337,13 +313,13 @@ bool PreLoadPatches()
 	ImGui::GetIO().IniFilename = (CGlobals::Get().orangePath + "\\imgui.ini").c_str();
 	ImGui::GetIO().LogFilename = (CGlobals::Get().orangePath + "\\imgui_log.txt").c_str();
 
-	auto mem = CMemory((uintptr_t)GetModuleHandle(NULL) + 0x14493);
-	mem.put(0xEB90909090909090);
+	GameMem("StartupPatch").put(0xEB90909090909090);
 
 	DefineNatives();
 	ForceToSingle();
 	UnknownPatches();
 	HookLoop();
 	GameProcessHooks();
+	log_info << "Game patches applied" << std::endl;
 	return true;
 }
