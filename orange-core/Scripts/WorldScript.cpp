@@ -30,7 +30,7 @@ static int RemoveAllBlips()
 
 static void WorldOnce()
 {
-	Player player = PLAYER::PLAYER_ID();
+	_Player player = PLAYER::PLAYER_ID();
 	Ped ped = PLAYER::PLAYER_PED_ID();
 
 	// nothing new spawns...
