@@ -154,6 +154,48 @@ those projects. The comments in the template say what is patched (`5 bytes
 nopped`, `function start replaced by ret`, `rel32 at +3`), and a diff of the
 surrounding code between builds is usually enough to find the new location.
 
+## When the game refuses to start
+
+A patch that lands on the wrong instruction usually does not crash: the game
+stops during startup, with its own message ("failed to initialize", an error
+code, or a silent exit). Since orange-core 0.2, the byte patches inherited
+from the 2017 patch lists (`ForceToSingle`, every `UnknownPatch_*`, the whole
+`GameProcessHooks` group) are **not applied on a build other than the
+reference one** for exactly that reason: a pattern match proves the bytes look
+alike, not that the instruction means the same thing. `client.log` says how
+many were skipped. Enable one at a time with `Name = scan` in `offsets.ini`.
+
+To find what breaks a start, work down this list; each step needs no rebuild,
+only a file next to `orange-core.dll` and a restart of the **game** (loading
+the DLL into a game that already has it does nothing).
+
+1. **`orange.nohooks`** (an empty file). Offsets are resolved and logged, then
+   nothing is patched and no hook is installed.
+   * The game still fails to start → the cause is not our patching. Suspect
+     the injection itself (timing, the DLL's own dependencies) or something
+     outside GTA:Orange.
+   * The game starts → one of our changes is responsible; continue.
+2. **`orange.storymode`**. The stock single player scripts keep running
+   instead of being frozen. If this makes the difference, the game needs its
+   own scripts to finish starting up.
+3. **Turn the hooks off one at a time** in `offsets.ini`:
+
+   ```ini
+   [1.0.3889.0]
+   StartupScript    = disabled   ; the "game ready" trigger
+   LookAlive        = disabled   ; the per-frame hook
+   ScriptIdCompare  = disabled   ; the script ownership check
+   WindowCreateCall = disabled   ; window title and icon
+   ```
+
+   Add one line, start the game, read `client.log`. The line that makes the
+   game start again names the culprit.
+4. **Enable the byte patches one at a time** (`ForceToSingle = scan`, ...)
+   once the game starts reliably, if you want what they do.
+
+`client.log` records every hook it installed and every patch it wrote, so the
+last lines before the game gives up say how far it got.
+
 ## What offsets do not cover
 
 Updating the addresses is necessary but not sufficient for a modern build:

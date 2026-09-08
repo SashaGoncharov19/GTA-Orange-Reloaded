@@ -160,6 +160,42 @@ static const Entry g_entries[] = {
 
 static const size_t g_entryCount = sizeof(g_entries) / sizeof(g_entries[0]);
 
+// Byte patches inherited from the 2017 patch lists: they change the game's
+// code, and what they mean is only established for the reference build. On any
+// other build a pattern match proves that the bytes look alike, not that the
+// instruction plays the same role there, and a wrong patch in the boot path
+// stops the game from starting at all ("failed to initialize"). They are
+// therefore skipped on a non-reference build unless offsets.ini asks for one by
+// name ("ForceToSingle = scan", or an RVA). Reads and hooks orange-core needs
+// to work at all are not in this list.
+static const char* const g_unverifiedPatches[] = {
+	"StartupPatch", "ForceToSingle", "ForceToSingle_2",
+	"UnknownPatch_1", "UnknownPatch_2", "UnknownPatch_3", "UnknownPatch_4", "UnknownPatch_5",
+	"UnknownPatch_6", "UnknownPatch_7", "UnknownPatch_8", "UnknownPatch_9", "UnknownPatch_10",
+	"CheckMultiplayerByteDrawMapFrame", "EventHook",
+	"ObjectsPatch", "EscFreeze", "CheatConsole", "UIWheelSlowmo", "ShowCursor_1", "ShowCursor_2",
+	"RockstarLoadingLogo", "Tooltips", "SocialClubNews",
+	"DisableWantedGeneration_1", "DisableWantedGeneration_2", "IntentionalCrash",
+	"CrashLoadModelsTooQuickly", "CreateNetworkEventBindings", "LoadNewGame",
+	"ResetVehicleDensityLastFrame", "VarVehicleDensity", "SetClockForwardAfterDeath",
+	"DisableNorthBlip", "DisableVehicleResetAtSetPosition", "DisableLoadingMpDlcContent",
+	"RuntimeExecutableImportsCheck",
+	"DisablePopulationVehicles_10", "DisablePopulationVehicles_8",
+	"DisablePopulationVehicles_11a", "DisablePopulationVehicles_11b",
+	"DisablePopulationPeds_1", "DisablePopulationPeds_2", "DisablePopulationAmbientPeds",
+	"DisablePopulationPeds_4",
+	"DisableCopsAndFireTrucks_1", "DisableCopsAndFireTrucks_2", "DisableCopsAndFireTrucks_3",
+	"SnowPatch",
+};
+
+static bool IsUnverifiedPatch(const char* name)
+{
+	for (const char* patch : g_unverifiedPatches)
+		if (_stricmp(patch, name) == 0)
+			return true;
+	return false;
+}
+
 // Entries whose pattern was written down by the original authors next to the
 // RVA; all five matching at their reference RVA identifies the reference build.
 static const char* const g_referenceSignatures[] = {
@@ -558,6 +594,7 @@ bool Initialize()
 
 	size_t counts[5] = { 0, 0, 0, 0, 0 };
 	size_t unresolvedRequired = 0;
+	size_t unverifiedSkipped = 0;
 	for (Status& status : g_status)
 	{
 		bool decided = false;
@@ -574,7 +611,20 @@ bool Initialize()
 				decided = ApplyIniValue(status, *value, section);
 		}
 		if (!decided)
-			ResolveWithBuiltins(status);
+		{
+			// A code patch nobody has confirmed for this build is more likely
+			// to break the game than to help; offsets.ini opts back in.
+			if (!g_referenceBuild && IsUnverifiedPatch(status.entry->name))
+			{
+				status.source = Source::Unresolved;
+				status.rva = 0;
+				status.note = "unverified patch, not applied on a build other than the reference one "
+					"(put \"" + std::string(status.entry->name) + " = scan\" in offsets.ini to apply it anyway)";
+				++unverifiedSkipped;
+			}
+			else
+				ResolveWithBuiltins(status);
+		}
 
 		if (status.rva != 0 && status.rva >= g_imageSize)
 		{
@@ -605,6 +655,9 @@ bool Initialize()
 		<< counts[(int)Source::Scan] << " by pattern, "
 		<< counts[(int)Source::Disabled] << " disabled, "
 		<< counts[(int)Source::Unresolved] << " unresolved (" << unresolvedRequired << " required)" << std::endl;
+	if (unverifiedSkipped)
+		log_info << "Offsets: " << unverifiedSkipped << " unverified code patch(es) were NOT applied on this build; "
+			"orange-core only reads the game and installs its hooks. See docs/UPDATING_OFFSETS.md to enable them one by one." << std::endl;
 
 	if (g_referenceBuild && CGlobals::Get().isDeveloper)
 		VerifyPatternsAgainstReference();
