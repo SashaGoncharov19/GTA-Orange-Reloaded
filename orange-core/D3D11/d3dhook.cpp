@@ -284,9 +284,37 @@ static bool g_renderInitFailed = false;
 // swap chain the game presents with. Runs once: right away when the game's
 // swap chain pointer is known (SwapChain offset), otherwise inside the first
 // Present call, which also tells us the game window.
+// Every swap chain of the process shares the hooked vtable entry, so Present
+// can arrive from an overlay's or a helper's swap chain first. Only the one
+// that presents into the game window ("grcWindow") is used; the others are
+// passed through untouched.
+static bool IsGameSwapChain(IDXGISwapChain* swapchain, DXGI_SWAP_CHAIN_DESC& sd)
+{
+	ZeroMemory(&sd, sizeof(sd));
+	if (FAILED(swapchain->GetDesc(&sd)))
+		return false;
+	HWND game = CGlobals::Get().gtaHwnd ? CGlobals::Get().gtaHwnd : FindWindowW(L"grcWindow", NULL);
+	if (!game || !sd.OutputWindow || sd.OutputWindow == game)
+		return true;
+	static std::set<HWND> reported;
+	if (reported.insert(sd.OutputWindow).second)
+	{
+		wchar_t cls[64] = { 0 };
+		GetClassNameW(sd.OutputWindow, cls, 64);
+		char narrow[64] = { 0 };
+		WideCharToMultiByte(CP_UTF8, 0, cls, -1, narrow, 64, NULL, NULL);
+		log_info << "D3DHook: Present from a swap chain of another window (0x" << std::hex << (uintptr_t)sd.OutputWindow << std::dec
+			<< ", class '" << narrow << "', " << sd.BufferDesc.Width << "x" << sd.BufferDesc.Height << "), waiting for the game window's" << std::endl;
+	}
+	return false;
+}
+
 static void InitializeRendering(IDXGISwapChain* swapchain)
 {
 	if (g_renderInitialized || g_renderInitFailed || !swapchain)
+		return;
+	DXGI_SWAP_CHAIN_DESC probe;
+	if (!IsGameSwapChain(swapchain, probe))
 		return;
 	ID3D11Device* device = nullptr;
 	if (FAILED(swapchain->GetDevice(__uuidof(ID3D11Device), (void**)&device)) || !device)
@@ -334,7 +362,19 @@ static void InitializeRendering(IDXGISwapChain* swapchain)
 
 	CreateRenderTarget();
 	g_renderInitialized = true;
-	log_info << "D3DHook: rendering initialised (" << sd.BufferDesc.Width << "x" << sd.BufferDesc.Height << ")" << std::endl;
+	{
+		wchar_t cls[64] = { 0 };
+		if (sd.OutputWindow)
+			GetClassNameW(sd.OutputWindow, cls, 64);
+		char narrow[64] = { 0 };
+		WideCharToMultiByte(CP_UTF8, 0, cls, -1, narrow, 64, NULL, NULL);
+		RECT client = { 0, 0, 0, 0 };
+		if (sd.OutputWindow)
+			GetClientRect(sd.OutputWindow, &client);
+		log_info << "D3DHook: rendering initialised (" << sd.BufferDesc.Width << "x" << sd.BufferDesc.Height << " back buffer, window 0x"
+			<< std::hex << (uintptr_t)sd.OutputWindow << std::dec << " class '" << narrow << "' client " << client.right << "x" << client.bottom
+			<< (sd.Windowed ? ", windowed" : ", fullscreen") << ")" << std::endl;
+	}
 	AttachInputHook();
 }
 

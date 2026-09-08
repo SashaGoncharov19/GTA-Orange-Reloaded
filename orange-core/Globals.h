@@ -32,6 +32,10 @@ public:
 	bool isDeveloper = false;
 	bool storyMode = false;      // orange.storymode: let the stock single player scripts run
 	bool noHooks = false;        // orange.nohooks: resolve the offsets, then touch nothing at all
+	// Sampled by the script thread every tick (IS_PAUSE_MENU_ACTIVE and the
+	// front-end check) so that the render thread never calls a native itself:
+	// natives share one call context and belong to the script thread.
+	bool pauseMenuActive = false;
 	bool d3dloaded = false;
 	Cam currentcam;
 	ID3D11Device *d3dDevice = nullptr;

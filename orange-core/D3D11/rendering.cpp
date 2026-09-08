@@ -22,7 +22,10 @@ void CreateRenderTarget()
 
 void D3DHook::Render()
 {
-	if (UI::IS_PAUSE_MENU_ACTIVE() || UI::_0xE18B138FABC53103())
+	// Present runs on the render thread; the pause menu state is sampled by
+	// the script thread (ScriptManagerThread::DoRun), never read here through
+	// a native: the native call context is one shared object.
+	if (CGlobals::Get().pauseMenuActive)
 		return;
 	ImGui_ImplDX11_NewFrame();
 	CGuiDispatcher::Get()();
