@@ -33,9 +33,13 @@
 #                      0 injects right after the executable is unpacked.
 #   --dump-game        passed to OrangeLauncher.exe: write the unpacked GTA5.exe
 #                      image (for IDA / Ghidra) next to this script, no inject
+#   --no-self-update   do not refresh this script and crossmap_from_fivem.py
+#                      from the release (the launcher updates only the
+#                      Windows binaries; this script updates the Linux side)
 #   -h, --help         show this help
 #
-# Environment overrides: ORANGE_CLIENT_DIR, STEAM_ROOT, PROTON_DIR, GTA_APPID
+# Environment overrides: ORANGE_CLIENT_DIR, STEAM_ROOT, PROTON_DIR, GTA_APPID,
+#   ORANGE_SELF_UPDATE=0 (same as --no-self-update), ORANGE_REPOSITORY
 #
 # Logs:
 #   <client dir>/launcher.log   every step of the launcher (update check,
@@ -60,7 +64,10 @@ TIMEOUT=600
 LAUNCH=1
 LOG_TAIL=1
 LOGS_ONLY=0
+SELF_UPDATE="${ORANGE_SELF_UPDATE:-1}"
+ORANGE_REPOSITORY="${ORANGE_REPOSITORY:-SashaGoncharov19/GTA-Orange-Reloaded}"
 EXTRA_ARGS=()
+ORIGINAL_ARGS=("$@")
 
 usage() { sed -n '2,45p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 log() { printf '[gta-orange] %s\n' "$*" >&2; }
@@ -74,6 +81,7 @@ while [ $# -gt 0 ]; do
 		--timeout) TIMEOUT="$2"; shift 2 ;;
 		--logs) LOGS_ONLY=1; shift ;;
 		--no-log-tail) LOG_TAIL=0; shift ;;
+		--no-self-update) SELF_UPDATE=0; shift ;;
 		-h|--help) usage; exit 0 ;;
 		--) shift; EXTRA_ARGS+=("$@"); break ;;
 		*) EXTRA_ARGS+=("$1"); shift ;;
@@ -82,6 +90,73 @@ done
 
 LAUNCHER_LOG="$CLIENT_DIR/launcher.log"
 CLIENT_LOG="$CLIENT_DIR/client.log"
+
+# --- self-update of the Linux side -------------------------------------------
+# OrangeLauncher.exe updates the Windows binaries, never this script or
+# crossmap_from_fivem.py, so every improvement of the Linux side used to need
+# a fresh unpack of the client package. Each release also carries
+# linux-manifest.txt (version, sha256 per file); when a file next to this
+# script differs from it, the release's copy is downloaded, verified and put
+# in place, and this script restarts itself when it was the one replaced.
+# The channel follows the launcher (its log), else the packaged version.txt.
+self_update() {
+	[ "$SELF_UPDATE" = 1 ] || return 0
+	[ "${ORANGE_SELF_UPDATED:-0}" = 1 ] && return 0
+	command -v curl >/dev/null 2>&1 && command -v sha256sum >/dev/null 2>&1 || return 0
+
+	local script dir channel base manifest version
+	dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	script="$dir/$(basename "${BASH_SOURCE[0]}")"
+	channel="$(grep -a 'updater: channel' "$LAUNCHER_LOG" 2>/dev/null | tail -n 1 | sed -E 's/.*updater: channel ([a-z]+).*/\1/' || true)"
+	if [ -z "$channel" ]; then
+		if [ -f "$dir/version.txt" ] && grep -q '^nightly' "$dir/version.txt"; then channel=nightly; else channel=stable; fi
+	fi
+	case "$channel" in
+		nightly) base="https://github.com/$ORANGE_REPOSITORY/releases/download/nightly" ;;
+		*) base="https://github.com/$ORANGE_REPOSITORY/releases/latest/download" ;;
+	esac
+	base="${ORANGE_LINUX_MANIFEST_BASE:-$base}"
+	manifest="$(curl -fsSL --max-time 15 "$base/linux-manifest.txt" 2>/dev/null || true)"
+	if [ -z "$manifest" ]; then
+		log "self-update: $base/linux-manifest.txt not reachable (offline, or a release without it); using the files here"
+		return 0
+	fi
+	version="$(printf '%s\n' "$manifest" | sed -n 's/^version //p' | head -n 1)"
+
+	local name sha size target tmp local_sha changed=0 restart=0
+	while read -r _ name sha size; do
+		[ -n "$name" ] && [ -n "$sha" ] || continue
+		case "$name" in */*|.*|'') continue ;; esac     # plain file names next to this script only
+		target="$dir/$name"
+		local_sha=""
+		[ -f "$target" ] && local_sha="$(sha256sum "$target" | cut -d' ' -f1)"
+		[ "$local_sha" = "$sha" ] && continue
+		tmp="$target.new"
+		if ! curl -fsSL --max-time 60 -o "$tmp" "$base/$name"; then
+			log "self-update: could not download $name, keeping the current one"
+			rm -f "$tmp"
+			continue
+		fi
+		if [ "$(sha256sum "$tmp" | cut -d' ' -f1)" != "$sha" ]; then
+			log "self-update: checksum mismatch for $name, keeping the current one"
+			rm -f "$tmp"
+			continue
+		fi
+		case "$name" in *.sh) chmod +x "$tmp" ;; esac
+		mv -f "$tmp" "$target"
+		log "self-update: $name replaced by the $version one"
+		changed=1
+		[ "$target" = "$script" ] && restart=1
+	done < <(printf '%s\n' "$manifest" | grep '^file ' || true)
+
+	if [ "$restart" = 1 ]; then
+		log "self-update: restarting with the new script"
+		ORANGE_SELF_UPDATED=1 exec "$script" ${ORIGINAL_ARGS[@]+"${ORIGINAL_ARGS[@]}"}
+	fi
+	[ "$changed" = 0 ] && log "self-update: the Linux-side files are current ($version)"
+	return 0
+}
+self_update
 
 # --- log helpers --------------------------------------------------------------
 show_log() {
@@ -221,6 +296,10 @@ check_package_version() {
 	packaged="$(tr -d '[:space:]' < "$CLIENT_DIR/version.txt")"
 	running="$(grep -a 'GTA:Orange Launcher .* started' "$LAUNCHER_LOG" | tail -n 1 | sed -E 's/.*GTA:Orange Launcher (.*) started.*/\1/' || true)"
 	if [ -n "$packaged" ] && [ -n "$running" ] && [ "$packaged" != "$running" ]; then
+		if grep -aq "updater: updated to version $running" "$LAUNCHER_LOG"; then
+			log "Client binaries were auto-updated to $running (the package unpacked here was $packaged)."
+			return 0
+		fi
 		log "WARNING: the launcher that ran is version '$running', but this package is '$packaged'."
 		log "         OrangeLauncher.exe / orange-core.dll next to this script are not the ones from the package"
 		log "         (the auto-updater replaced them, or the zip was unpacked into another folder)."

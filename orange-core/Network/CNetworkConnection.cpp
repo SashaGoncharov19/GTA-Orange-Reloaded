@@ -136,6 +136,12 @@ void CNetworkConnection::Tick()
 			{
 				log_info << "Network: the server accepted the player, synchronisation starts" << std::endl;
 				bEstablished = true;
+				// Leave the lobby scene (scripted camera, hidden HUD) now;
+				// until here that only happened when a resource positioned
+				// the player, and a server without resources left the
+				// player staring at the Vinewood panorama.
+				if (!CLocalPlayer::Get()->Spawned)
+					CLocalPlayer::Get()->Spawn();
 				break;
 			}
 			case ID_SEND_PLAYER_DATA:

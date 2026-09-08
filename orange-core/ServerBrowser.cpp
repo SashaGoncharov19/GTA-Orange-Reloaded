@@ -19,17 +19,30 @@ static void QueueConnect()
 	CGlobals::Get().showChat = true;
 }
 
-// ShowCursor keeps a counter: one TRUE when the window appears, one FALSE
-// when it goes (the 2017 code called ShowCursor(TRUE) every frame, and the
-// cursor stayed on the screen after connecting).
+// The game keeps hiding the Windows cursor, so a single ShowCursor(TRUE) is
+// undone within a frame (the first run with that change had no visible cursor
+// at all): ask for it every frame while the window is shown, as 2017 did, and
+// let ImGui draw its own cursor on top, which does not depend on the game's
+// cursor handling at all. When the window goes, the display counter is driven
+// below zero once, so the cursor does not stay on the screen while playing.
 static void CursorForBrowser(bool shown)
 {
 	static bool cursorShown = false;
-	if (shown == cursorShown)
+	ImGui::GetIO().MouseDrawCursor = shown;
+	if (shown)
+	{
+		ShowCursor(TRUE);
+		if (!cursorShown)
+			(*CGlobals::Get().canLangChange) = true;
+		cursorShown = true;
 		return;
-	cursorShown = shown;
-	ShowCursor(shown ? TRUE : FALSE);
-	(*CGlobals::Get().canLangChange) = shown;
+	}
+	if (cursorShown)
+	{
+		while (ShowCursor(FALSE) >= 0) {}
+		(*CGlobals::Get().canLangChange) = false;
+		cursorShown = false;
+	}
 }
 
 void ServerBrowser()

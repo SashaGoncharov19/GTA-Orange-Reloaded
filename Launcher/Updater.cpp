@@ -361,6 +361,12 @@ UpdateResult Updater::Run()
 	}
 
 	LauncherLog("updater: updated to version " + manifest.version + (restart ? " (restart required)" : ""));
+	// version.txt describes the package that was unpacked here; after an
+	// update it describes the binaries again (the Proton helper compares it
+	// with the launcher version in launcher.log).
+	std::string versionLine = manifest.version + "\n";
+	if (!WriteWholeFile(m_installDir + L"\\version.txt", std::vector<char>(versionLine.begin(), versionLine.end())))
+		LauncherLog("updater: could not write version.txt");
 	Progress(L"Update installed", 0.3f);
 	return restart ? UpdateResult::RestartRequired : UpdateResult::Updated;
 }
