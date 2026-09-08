@@ -203,8 +203,50 @@ bool Injector::Inject(int processId, std::string dllName, std::string& error)
 	return true;
 }
 
+// File offset of an RVA inside the executable on disk, 0 when it cannot be
+// determined (used to compare the code section on disk with memory).
+static uint64_t RvaToFileOffset(const std::wstring& exePath, uint32_t rva)
+{
+	std::ifstream in(exePath, std::ios::binary);
+	if (!in)
+		return 0;
+	IMAGE_DOS_HEADER dos;
+	in.read((char*)&dos, sizeof(dos));
+	if (!in || dos.e_magic != IMAGE_DOS_SIGNATURE)
+		return 0;
+	in.seekg(dos.e_lfanew);
+	IMAGE_NT_HEADERS64 nt;
+	in.read((char*)&nt, sizeof(nt));
+	if (!in || nt.Signature != IMAGE_NT_SIGNATURE)
+		return 0;
+	in.seekg((std::streamoff)dos.e_lfanew + FIELD_OFFSET(IMAGE_NT_HEADERS64, OptionalHeader) + nt.FileHeader.SizeOfOptionalHeader);
+	for (int i = 0; i < nt.FileHeader.NumberOfSections; ++i)
+	{
+		IMAGE_SECTION_HEADER section;
+		in.read((char*)&section, sizeof(section));
+		if (!in)
+			return 0;
+		uint32_t size = section.Misc.VirtualSize > section.SizeOfRawData ? section.Misc.VirtualSize : section.SizeOfRawData;
+		if (rva >= section.VirtualAddress && rva < section.VirtualAddress + size)
+			return (uint64_t)section.PointerToRawData + (rva - section.VirtualAddress);
+	}
+	return 0;
+}
+
+static bool ReadFileBytes(const std::wstring& path, uint64_t offset, unsigned char* out, size_t size)
+{
+	std::ifstream in(path, std::ios::binary);
+	if (!in)
+		return false;
+	in.seekg((std::streamoff)offset);
+	in.read((char*)out, (std::streamsize)size);
+	return (size_t)in.gcount() == size;
+}
+
 // The retail executable is packed; wait until its code section has been
-// rewritten in memory before patching anything. Gives up after the timeout.
+// rewritten in memory before patching anything. When the game was started
+// by someone else (--inject) that usually happened already, which shows as
+// memory differing from the file on disk. Gives up after the timeout.
 bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 {
 	HANDLE process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
@@ -216,6 +258,7 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 
 	ULONGLONG deadline = GetTickCount64() + (ULONGLONG)timeoutSeconds * 1000ULL;
 	HMODULE hMod = NULL;
+	std::wstring exePath;
 	while (hMod == NULL)
 	{
 		HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid);
@@ -229,6 +272,7 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 					if (_wcsicmp(PROCESS_NAME, ModEnt.szModule) == 0)
 					{
 						hMod = ModEnt.hModule;
+						exePath = ModEnt.szExePath;
 						break;
 					}
 				} while (Module32Next(snapshot, &ModEnt));
@@ -248,7 +292,28 @@ bool Injector::WaitForUnpackFinished(int pid, int timeoutSeconds)
 	}
 
 	unsigned char buff[10] = { 0 };
-	ReadProcessMemory(process, (LPVOID)((uint64_t)hMod + 0x1000), buff, 10, NULL);
+	if (!ReadProcessMemory(process, (LPVOID)((uint64_t)hMod + 0x1000), buff, 10, NULL))
+	{
+		LauncherLog("unpack wait: ReadProcessMemory failed (" + LastErrorText() + ")");
+		CloseHandle(process);
+		return false;
+	}
+
+	unsigned char disk[10] = { 0 };
+	uint64_t fileOffset = exePath.empty() ? 0 : RvaToFileOffset(exePath, 0x1000);
+	if (fileOffset && ReadFileBytes(exePath, fileOffset, disk, sizeof(disk)))
+	{
+		if (memcmp(buff, disk, sizeof(disk)) != 0)
+		{
+			LauncherLog("unpack wait: the code section in memory already differs from the file on disk, executable is unpacked");
+			CloseHandle(process);
+			return true;
+		}
+		LauncherLog("unpack wait: code section still equals the file on disk, waiting for it to change");
+	}
+	else
+		LauncherLog("unpack wait: cannot compare with the file on disk, waiting for the code section to change in memory");
+
 	for (;;)
 	{
 		Sleep(5);
