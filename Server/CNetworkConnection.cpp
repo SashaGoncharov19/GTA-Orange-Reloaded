@@ -625,7 +625,8 @@ void CNetworkConnection::SendSnapshots(unsigned long nowMs)
 
 		for (size_t offset = 0; offset < snapshotNear.size(); offset += perDatagram)
 		{
-			size_t count = std::min(perDatagram, snapshotNear.size() - offset);
+			size_t count = snapshotNear.size() - offset;
+			if (count > perDatagram) count = perDatagram;   // no std::min: windows.h defines min
 			bs.Reset();
 			bs.Write((unsigned char)ID_PLAYER_SNAPSHOT);
 			bs.Write((unsigned int)nowMs);
