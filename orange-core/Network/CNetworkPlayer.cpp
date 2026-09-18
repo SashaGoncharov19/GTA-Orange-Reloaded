@@ -1,14 +1,28 @@
 #include "stdafx.h"
 
 std::vector<CNetworkPlayer *> CNetworkPlayer::PlayersPool;
+std::unordered_map<uint64_t, RemotePlayerInfo> CNetworkPlayer::Known;
 Hash CNetworkPlayer::hFutureModel = 0;
+CVector3 CNetworkPlayer::vecFuturePosition;
 int CNetworkPlayer::ignoreTasks = 0;
 
-CNetworkPlayer::CNetworkPlayer() :CPedestrian(0)
+CNetworkPlayer::CNetworkPlayer(RakNet::RakNetGUID guid) :CPedestrian(0)
 {
+	// the GUID is set before Spawn yields to the game, so a second lookup
+	// during the model load finds this player instead of creating another
+	m_GUID = guid;
+	auto info = Known.find(guid.g);
+	if (info != Known.end())
+	{
+		m_Name = info->second.name;
+		m_Id = info->second.id;
+		m_Color = info->second.color;
+		if (info->second.model)
+			hFutureModel = info->second.model;
+	}
 	PlayersPool.push_back(this);
 	m_Model = hFutureModel;
-	Spawn({ 0.f, 0.f, 0.f });
+	Spawn(vecFuturePosition);
 }
 
 CNetworkPlayer* CNetworkPlayer::GetByGUID(RakNet::RakNetGUID GUID, bool create)
@@ -19,12 +33,35 @@ CNetworkPlayer* CNetworkPlayer::GetByGUID(RakNet::RakNetGUID GUID, bool create)
 			return _player;
 	}
 	if (create)
-	{
-		CNetworkPlayer *_newPlayer = new CNetworkPlayer();
-		_newPlayer->m_GUID = GUID;
-		return _newPlayer;
-	}
+		return new CNetworkPlayer(GUID);
 	return nullptr;
+}
+
+void CNetworkPlayer::Remember(RakNet::RakNetGUID guid, const RemotePlayerInfo & info)
+{
+	Known[guid.g] = info;
+}
+
+const RemotePlayerInfo * CNetworkPlayer::Info(RakNet::RakNetGUID guid)
+{
+	auto it = Known.find(guid.g);
+	return it == Known.end() ? nullptr : &it->second;
+}
+
+void CNetworkPlayer::Forget(RakNet::RakNetGUID guid)
+{
+	Known.erase(guid.g);
+}
+
+bool CNetworkPlayer::AcceptServerTime(unsigned int serverTime)
+{
+	// datagrams are unreliable and unordered: one built earlier can arrive
+	// after a newer one, and then it must not move the ped backwards
+	if (m_HasState && (int)(serverTime - m_ServerTime) < 0)
+		return false;
+	m_ServerTime = serverTime;
+	m_HasState = true;
+	return true;
 }
 
 bool CNetworkPlayer::Exists(RakNet::RakNetGUID GUID)
@@ -55,10 +92,28 @@ void CNetworkPlayer::Clear()
 		delete player;
 	}
 	PlayersPool.erase(PlayersPool.begin(), PlayersPool.end());
+	Known.clear();
 }
 
 void CNetworkPlayer::Tick()
 {
+	// A player the server stopped streaming to us (out of range, gone quiet,
+	// or its connection dropped) loses its ped after 10 s without state; it
+	// is created again by the next snapshot that carries it.
+	DWORD now = timeGetTime();
+	for (size_t i = 0; i < PlayersPool.size();)
+	{
+		CNetworkPlayer * player = PlayersPool[i];
+		if (player->m_HasState && now - player->lastTick > 10000)
+		{
+			log_debug << "Network: player '" << player->m_Name << "' streamed out" << std::endl;
+			PED::DELETE_PED(&player->Handle);
+			delete player;
+			PlayersPool.erase(PlayersPool.begin() + i);
+			continue;
+		}
+		i++;
+	}
 	for each (CNetworkPlayer * player in PlayersPool)
 	{
 		if (player->IsSpawned())
@@ -122,6 +177,12 @@ void CNetworkPlayer::DeleteByGUID(RakNet::RakNetGUID guid)
 void CNetworkPlayer::Spawn(const CVector3& vecPosition)
 {
 	m_Spawned = true;
+	// a model this game does not have (or none yet) still gets a visible ped
+	if (!(STREAMING::IS_MODEL_IN_CDIMAGE(m_Model) && STREAMING::IS_MODEL_VALID(m_Model)))
+	{
+		log_info << "Network: player '" << m_Name << "' uses unknown model 0x" << std::hex << m_Model << std::dec << ", freemode ped instead" << std::endl;
+		m_Model = Utils::Hash("mp_m_freemode_01");
+	}
 	if (STREAMING::IS_MODEL_IN_CDIMAGE(m_Model) && STREAMING::IS_MODEL_VALID(m_Model))
 	{
 		STREAMING::REQUEST_MODEL(m_Model);
@@ -136,10 +197,15 @@ void CNetworkPlayer::Spawn(const CVector3& vecPosition)
 		PED::SET_PED_COMBAT_ATTRIBUTES(Handle, 17, 1);
 		PED::SET_PED_CAN_RAGDOLL(Handle, false);
 		//PED::_SET_PED_RAGDOLL_FLAG(Handle, 1 | 2 | 4);
+		// CPed::Flags is the reference build's layout; elsewhere the write
+		// would land in an unknown field
+		if (pedHandler && GameOffsets::IsReferenceBuild())
+		{
 #if _DEBUG
-		pedHandler->Flags |= 1 << 30;
+			pedHandler->Flags |= 1 << 30;
 #endif
-		pedHandler->Flags |= 1 << 6;
+			pedHandler->Flags |= 1 << 6;
+		}
 		ENTITY::SET_ENTITY_PROOFS(Handle, true, true, true, true, true, true, true, true);
 		WEAPON::SET_PED_INFINITE_AMMO_CLIP(Handle, true);
 
@@ -271,7 +337,8 @@ void CNetworkPlayer::SetOnFootData(OnFootSyncData data, unsigned long ulDelay)
 		SetDucking(data.bDuckState);
 		m_Ducking = data.bDuckState;
 		SetMovementVelocity(data.vecMoveSpeed);
-		pedHandler->MoveSpeed = data.fMoveSpeed;
+		if (pedHandler && GameOffsets::IsReferenceBuild())
+			pedHandler->MoveSpeed = data.fMoveSpeed;   // 2017 CPed layout only
 		//m_Entering = false;
 	}
 	else {
@@ -585,13 +652,19 @@ void CNetworkPlayer::MakeTag()
 		Vector3 _camPos = CAM::GET_GAMEPLAY_CAM_COORD();
 		CVector3 camPos(_camPos.x, _camPos.y, _camPos.z);
 
-		CVector3 *vecCurPos = &pedHandler->Position;
+		// position and max health through natives: CPed's layout is the
+		// reference build's
+		CVector3 curPos = GetPosition();
+		CVector3 *vecCurPos = &curPos;
 		tag.distance = (((*vecCurPos) - camPos).Length() / CAM::_GET_GAMEPLAY_CAM_ZOOM());
 
 		if (tag.distance > 70.f)
 			return;
 
-		tag.health = ((((m_Health - 100.f) < pedHandler->MaxHealth ? (m_Health - 100.f) : pedHandler->MaxHealth)) / (pedHandler->MaxHealth - 100.f));
+		float maxHealth = (float)PED::GET_PED_MAX_HEALTH(Handle);
+		if (maxHealth <= 100.f)
+			maxHealth = 200.f;
+		tag.health = ((((m_Health - 100.f) < maxHealth ? (m_Health - 100.f) : maxHealth)) / (maxHealth - 100.f));
 		
 		if (tag.health > 1.f)
 			tag.health = 1.f;
@@ -629,7 +702,7 @@ void CNetworkPlayer::DrawTag()
 		ImGui::GetWindowDrawList()->AddText(CGlobals::Get().tagFont, font_size, ImVec2(tag.x - textSize.x / 2 + 1, tag.y + 1), ImColor(0, 0, 0, 255), _name);
 		ImGui::GetWindowDrawList()->AddText(CGlobals::Get().tagFont, font_size, ImVec2(tag.x - textSize.x / 2 + 1, tag.y - 1), ImColor(0, 0, 0, 255), _name);
 		ImGui::GetWindowDrawList()->AddText(CGlobals::Get().tagFont, font_size, ImVec2(tag.x - textSize.x / 2 - 1, tag.y + 1), ImColor(0, 0, 0, 255), _name);
-		ImGui::GetWindowDrawList()->AddText(CGlobals::Get().tagFont, font_size, ImVec2(tag.x - textSize.x / 2, tag.y), ImColor(0xFF, 0xFF, 0xFF, 0xFF), _name);
+		ImGui::GetWindowDrawList()->AddText(CGlobals::Get().tagFont, font_size, ImVec2(tag.x - textSize.x / 2, tag.y), ImColor(m_Color.red, m_Color.green, m_Color.blue, 0xFF), _name);
 
 		color_t bgColor, fgColor;
 
@@ -682,10 +755,13 @@ void CNetworkPlayer::SetModel(Hash model)
 		PED::SET_PED_COMBAT_ATTRIBUTES(Handle, 17, 1);
 		PED::SET_PED_CAN_RAGDOLL(Handle, m_Ragdoll);
 		//PED::_SET_PED_RAGDOLL_FLAG(Handle, 1 | 2 | 4);
+		if (pedHandler && GameOffsets::IsReferenceBuild())
+		{
 #if _DEBUG
-		pedHandler->Flags |= 1 << 30;
+			pedHandler->Flags |= 1 << 30;
 #endif
-		pedHandler->Flags |= 1 << 6;
+			pedHandler->Flags |= 1 << 6;
+		}
 		ENTITY::SET_ENTITY_PROOFS(Handle, true, true, true, true, true, true, true, true);
 		WEAPON::SET_PED_INFINITE_AMMO_CLIP(Handle, true);
 	}

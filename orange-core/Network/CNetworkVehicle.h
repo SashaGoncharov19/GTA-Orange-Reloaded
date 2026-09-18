@@ -89,6 +89,8 @@ public:
 	int GetTickTime();
 
 	void SetVehicleData(VehicleData data, unsigned long ulDelay);
+	// moves the vehicle at once (a script asked for it), no interpolation
+	void Teleport(const CVector3 & position);
 
 	static std::vector<CNetworkVehicle*> All();
 	static void Clear();

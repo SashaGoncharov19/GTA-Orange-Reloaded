@@ -168,12 +168,18 @@ Tick and script id hooks pass everything through).
    channel, and `ID_PLAYER_INFO` records for who is who. Packets from
    connections that never completed the handshake are dropped instead of
    creating ghost players. Measured with `orange_bot`: 1000 players at
-   20 Hz cost about a tenth of a core. **Client side: still the 2017
-   path** - `orange-core` sends every frame, reliable ordered, and handles
-   `ID_SEND_PLAYER_DATA` from the old relay only; the server keeps that
-   relay for clients that announce protocol 1, so the current client
-   still sees the others, at the old cost. Consuming the snapshots is the
-   next round.
+   20 Hz cost about a tenth of a core. **Client side: done the same day.**
+   `orange-core` announces its version and protocol 2, sends its state 20
+   times a second on foot and 30 in a vehicle (unreliable, own channel,
+   instead of every frame reliable-ordered), consumes `ID_PLAYER_INFO` and
+   `ID_PLAYER_SNAPSHOT` (a remote ped appears where the player is the first
+   time it is streamed, is interpolated over the measured update interval,
+   and goes away after 10 s without state), and still understands the 2017
+   relay from an older server. The remote-ped code no longer writes the
+   2017 `CPed` fields (`Flags`, `MoveSpeed`) or the 2017 `CVehicle` offsets
+   (steering, RPM) off the reference build; name tags read position and
+   max health through natives. `SetVehicleCoords` from a script now moves
+   the vehicle on the clients (`SetVehiclePos` RPC).
 
 ## 5. Natives crossmap: how it works and how to redo it
 

@@ -105,6 +105,32 @@ vehicle nobody has updated for 2 s can be claimed by whoever sends next.
 Tasks (`ID_SEND_TASKS`) stay reliable on channel 0 and are relayed to the
 players near the sender.
 
+## What the client does with it
+
+`orange-core/Network/CNetworkConnection.cpp`:
+
+* `ID_PLAYER_INFO` records go into a who-is-who list (`RemotePlayerInfo`:
+  id, name, model, colour) that outlives the ped. A player's ped exists
+  only while the server streams that player to us.
+* The first `ID_PLAYER_SNAPSHOT` entry for a GUID creates the ped with the
+  entry's model at the entry's position (the info record, when it arrived
+  first, supplies the name and colour); later entries feed the
+  interpolation, whose delay is the measured interval between updates for
+  that player, clamped to 50-200 ms. An entry from a datagram older than
+  the last one applied is ignored (`AcceptServerTime`).
+* A remote player without state for 10 s is deleted
+  (`CNetworkPlayer::Tick`), which is how streaming out and lost connections
+  look from here; `ID_PLAYER_LEFT` deletes it at once and forgets the
+  record.
+* The 2017 relay (`ID_SEND_PLAYER_DATA` with the name) is still understood,
+  for a server that has not been updated.
+* Sending: `CLocalPlayer::SendOnFootData` runs every frame but sends only
+  every 50 ms on foot and every 33 ms while driving, `UNRELIABLE_SEQUENCED`
+  on channel 1; the vehicle state goes with it when we are the driver of a
+  server vehicle.
+* A lost or closed connection clears the remote players and shows the
+  server browser again.
+
 ## Server-side messages and RPCs
 
 The rest goes through the RakNet RPC4 plugin, reliable on channel 0, by name:
@@ -184,12 +210,12 @@ pair loop.
 
 * **Compact entries.** 104 bytes per player state is the lever for bandwidth
   at 1000 players (quantised heading, velocity and aim, no model hash in
-  every packet); this is a client-side change as well, so it is scheduled
-  with the client work.
-* **Client** (`orange-core`): consume `ID_PLAYER_SNAPSHOT` and
-  `ID_PLAYER_INFO`, send at 20/30 Hz on channel 1 instead of every frame on
-  channel 0, time out remote players, derive the interpolation delay from
-  the measured interval.
-* **Vehicles** through the same batch path as players.
+  every packet); both sides change together.
+* **Vehicles** through the same batch path as players, and a vehicle
+  stream-out on the client.
 * **Priority** inside the cap: players in view or aiming at each other
   before those behind.
+* **Movement quality** on the client: the remote ped is still driven by a
+  go-to task re-issued every frame plus velocity; a proper motion blend
+  (walk/run/sprint by reported speed, strafing while aiming) is the next
+  gameplay step.

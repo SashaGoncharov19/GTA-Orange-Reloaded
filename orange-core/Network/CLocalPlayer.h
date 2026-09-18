@@ -19,6 +19,7 @@ public:
 	CNetworkVehicle *FutureVeh = nullptr;
 
 	short lastSendSeat;
+	DWORD lastSyncSendMs = 0;
 
 	static CLocalPlayer *Get();
 
@@ -26,7 +27,7 @@ public:
 	void Connect();
 	void Tick();
 	void GetOnFootSync(OnFootSyncData& onfoot);
-	void GetVehicleSync(VehicleData & vehsync);
+	bool GetVehicleSync(VehicleData & vehsync);
 	void SendOnFootData();
 	short GetSeat();
 	void GoPassenger();

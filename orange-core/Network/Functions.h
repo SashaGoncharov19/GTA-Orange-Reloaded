@@ -31,6 +31,7 @@ namespace FPlayer
 
 	void CreateVehicle(RakNet::BitStream *bitStream, RakNet::Packet *packet);
 	void DeleteVehicle(RakNet::BitStream *bitStream, RakNet::Packet *packet);
+	void SetVehiclePos(RakNet::BitStream *bitStream, RakNet::Packet *packet);
 
 	void CreateMarker(RakNet::BitStream *bitStream, RakNet::Packet *packet);
 	void DeleteMarker(RakNet::BitStream * bitStream, RakNet::Packet * packet);

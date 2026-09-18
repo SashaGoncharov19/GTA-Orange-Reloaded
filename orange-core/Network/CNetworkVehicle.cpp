@@ -234,8 +234,22 @@ void CNetworkVehicle::BuildTasksQueue()
 	VEHICLE::SET_VEHICLE_PETROL_TANK_HEALTH(Handle, m_TankHealth);
 
 	if (!ENTITY::DOES_ENTITY_EXIST(Handle)) return;
-	*CMemory(GetAddress()).get<float>(0x8CC) = m_steering / 180 * PI;
-	*CMemory(GetAddress()).get<float>(0x7F4) = m_RPM;
+	// steering angle and RPM live at the reference build's CVehicle offsets;
+	// on any other build the write would corrupt an unknown field
+	if (GameOffsets::IsReferenceBuild())
+	{
+		*CMemory(GetAddress()).get<float>(0x8CC) = m_steering / 180 * PI;
+		*CMemory(GetAddress()).get<float>(0x7F4) = m_RPM;
+	}
+}
+
+void CNetworkVehicle::Teleport(const CVector3 & position)
+{
+	if (Handle == 0) return;
+	m_interp.pos.ulFinishTime = 0;
+	m_interp.rot.ulFinishTime = 0;
+	ENTITY::SET_ENTITY_VELOCITY(Handle, 0.f, 0.f, 0.f);
+	SetPosition(position);
 }
 
 void CNetworkVehicle::UpdateLastTickTime()

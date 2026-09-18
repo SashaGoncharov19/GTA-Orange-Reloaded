@@ -51,6 +51,9 @@ void CLocalPlayer::Spawn()
 
 void CLocalPlayer::GetOnFootSync(OnFootSyncData& onfoot)
 {
+	memset(&onfoot, 0, sizeof(onfoot));   // the struct goes out as raw bytes: no stack garbage in the padding
+	onfoot.rnVehicle = UNASSIGNED_RAKNET_GUID;
+	onfoot.cSeat = -2;
 	onfoot.hModel = GetModel();
 	onfoot.bJumping = IsJumping();
 	onfoot.fMoveSpeed = GameOffsets::IsReferenceBuild() ? CWorld::Get()->CPedPtr->MoveSpeed : ENTITY::GET_ENTITY_SPEED(Handle);
@@ -103,12 +106,14 @@ void CLocalPlayer::GetOnFootSync(OnFootSyncData& onfoot)
 	}
 }
 
-void CLocalPlayer::GetVehicleSync(VehicleData& vehsync)
+bool CLocalPlayer::GetVehicleSync(VehicleData& vehsync)
 {
 	CNetworkVehicle *veh = CNetworkVehicle::GetByHandle(PED::GET_VEHICLE_PED_IS_IN(Handle, false));
 	if (!veh) {
-		return;
+		return false;   // not a server vehicle: nothing to report
 	}
+	memset(&vehsync, 0, sizeof(vehsync));
+	vehsync.driver = UNASSIGNED_RAKNET_GUID;
 	vehsync.hasDriver = true;
 	vehsync.GUID = veh->m_GUID;
 	CVector3 pos = veh->GetPosition();
@@ -117,11 +122,21 @@ void CLocalPlayer::GetVehicleSync(VehicleData& vehsync)
 	vehsync.vecRot = veh->GetRotation();
 	vehsync.vecMoveSpeed = veh->GetMovementVelocity();
 
-	vehsync.RPM = *CMemory(veh->GetAddress()).get<float>(0x7F4);
 	vehsync.Burnout = VEHICLE::IS_VEHICLE_IN_BURNOUT(veh->GetHandle()) != 0;
-
-	if (VEHICLE::IS_THIS_MODEL_A_CAR(veh->GetModel()) || VEHICLE::IS_THIS_MODEL_A_BIKE(veh->GetModel()) || VEHICLE::IS_THIS_MODEL_A_QUADBIKE(veh->GetModel()))
-		vehsync.steering = (*CMemory(veh->GetAddress()).get<float>(0x8CC)) * (180.0f / PI);
+	if (GameOffsets::IsReferenceBuild())
+	{
+		vehsync.RPM = *CMemory(veh->GetAddress()).get<float>(0x7F4);
+		if (VEHICLE::IS_THIS_MODEL_A_CAR(veh->GetModel()) || VEHICLE::IS_THIS_MODEL_A_BIKE(veh->GetModel()) || VEHICLE::IS_THIS_MODEL_A_QUADBIKE(veh->GetModel()))
+			vehsync.steering = (*CMemory(veh->GetAddress()).get<float>(0x8CC)) * (180.0f / PI);
+	}
+	else
+	{
+		// CVehicle's RPM and steering offsets are the reference build's;
+		// an RPM from the speed and no steering angle on other builds
+		float rpm = 0.2f + ENTITY::GET_ENTITY_SPEED(veh->GetHandle()) / 40.f;
+		vehsync.RPM = rpm > 1.f ? 1.f : rpm;
+		vehsync.steering = 0.f;
+	}
 
 	vehsync.usHealth = veh->GetHealth();
 	vehsync.fEngineHealth = VEHICLE::GET_VEHICLE_ENGINE_HEALTH(veh->GetHandle());
@@ -132,13 +147,7 @@ void CLocalPlayer::GetVehicleSync(VehicleData& vehsync)
 	vehsync.bHorn = AUDIO::IS_HORN_ACTIVE(veh->GetHandle()) == 1;
 	vehsync.bSirenState = VEHICLE::IS_VEHICLE_SIREN_ON(veh->GetHandle()) == 1;
 
-	//log << "Vehicle: 0x" << std::hex << veh->GetAddress() << std::endl;
-	//log << "Horn: " << AUDIO::IS_HORN_ACTIVE(veh->GetHandle()) << std::endl;
-	//log << "Engine health: " << VEHICLE::GET_VEHICLE_ENGINE_HEALTH(veh->GetHandle()) << std::endl;
-	//log << "Body health: " << VEHICLE::GET_VEHICLE_BODY_HEALTH(veh->GetHandle()) << std::endl;
-	//log << "PetrolTank health: " << VEHICLE::GET_VEHICLE_PETROL_TANK_HEALTH(veh->GetHandle()) << std::endl;
-	//log << "Drivable: " << VEHICLE::IS_VEHICLE_DRIVEABLE(veh->GetHandle(), 0) << std::endl;
-	//log << "Health: " << veh->GetHealth() << std::endl;
+	return true;
 }
 
 CLocalPlayer * CLocalPlayer::Get()
@@ -188,7 +197,6 @@ void CLocalPlayer::Tick()
 	{
 		if (FutureVeh->GetHandle() != 0)
 		{
-			_MY_log << "s3" << std::endl;
 			PED::SET_PED_INTO_VEHICLE(Handle, FutureVeh->GetHandle(), FutureSeat);
 			if (PED::GET_VEHICLE_PED_IS_IN(Handle, false) == FutureVeh->GetHandle()) FutureVeh = nullptr;
 		}
@@ -233,31 +241,38 @@ void CLocalPlayer::Connect()
 	CNetworkConnection::Get()->client->Send(&requestid, HIGH_PRIORITY, RELIABLE_ORDERED, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 }
 
+// Called every frame; sends 20 states a second on foot and 30 while driving
+// (docs/NETWORK.md). The server keeps only the latest state and streams it
+// to the others at its own rate, so more would only fill the socket. State
+// is unreliable and sequenced on its own channel: a lost packet is replaced
+// by the next one 33-50 ms later, and never holds up chat or events.
 void CLocalPlayer::SendOnFootData()
 {
+	bool driving = PED::IS_PED_IN_ANY_VEHICLE(Handle, false) && GetSeat() == -1;
+	DWORD now = timeGetTime();
+	DWORD interval = 1000 / (driving ? ORANGE_CLIENT_SYNC_RATE_VEHICLE : ORANGE_CLIENT_SYNC_RATE_ON_FOOT);
+	if (now - lastSyncSendMs < interval)
+		return;
+	lastSyncSendMs = now;
+
 	RakNet::BitStream bsOut;
 	bsOut.Write((MessageID)ID_SEND_PLAYER_DATA);
 	OnFootSyncData data;
 	GetOnFootSync(data);
 	lastSendSeat = data.cSeat;
 	bsOut.Write(data);
+	CNetworkConnection::Get()->client->Send(&bsOut, MEDIUM_PRIORITY, UNRELIABLE_SEQUENCED, ORANGE_CHANNEL_STATE, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 
-	CNetworkConnection::Get()->client->Send(&bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
-
-	if (PED::IS_PED_IN_ANY_VEHICLE(Handle, false) && GetSeat() == -1) {
-		RakNet::BitStream bsOut2;
-		bsOut2.Write((MessageID)ID_SEND_VEHICLE_DATA);
-		VehicleData data;
-		GetVehicleSync(data);
-		bsOut2.Write(data);
-
-		CNetworkConnection::Get()->client->Send(&bsOut2, HIGH_PRIORITY, RELIABLE_ORDERED, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+	if (driving) {
+		VehicleData vehicle;
+		if (GetVehicleSync(vehicle))
+		{
+			RakNet::BitStream bsOut2;
+			bsOut2.Write((MessageID)ID_SEND_VEHICLE_DATA);
+			bsOut2.Write(vehicle);
+			CNetworkConnection::Get()->client->Send(&bsOut2, MEDIUM_PRIORITY, UNRELIABLE_SEQUENCED, ORANGE_CHANNEL_STATE, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+		}
 	}
-
-	//log << "Using: " << PED::GET_VEHICLE_PED_IS_USING(Handle) << std::endl;
-	//log << "In(false): " << PED::GET_VEHICLE_PED_IS_IN(Handle, false) << std::endl;
-	//log << "In(true): " << PED::GET_VEHICLE_PED_IS_IN(Handle, true) << std::endl;
-	//log << "Trying: " << PED::GET_VEHICLE_PED_IS_TRYING_TO_ENTER(Handle) << std::endl;
 }
 
 short CLocalPlayer::GetSeat()

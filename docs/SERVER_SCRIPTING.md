@@ -113,7 +113,7 @@ everything else; errors inside are logged as `[LUA] timer: ...`.
 | `VehicleExists(id)` | |
 | `GetVehicles()` | array of ids |
 | `GetVehicleCoords(id)` | `x, y, z` (as last reported by its driver) |
-| `SetVehicleCoords(id, x, y, z)` | moves it; the game client applies this once it handles `SetVehiclePos` (client work in progress) |
+| `SetVehicleCoords(id, x, y, z)` | moves it on every client (a player inside goes with it) |
 | `GetVehicleRotation(id)` | `x, y, z` |
 | `GetVehicleHealth(id)` | |
 | `GetVehicleModel(id)` | hash |
