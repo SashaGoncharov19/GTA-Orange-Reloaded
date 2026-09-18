@@ -52,9 +52,6 @@ int main(void)
 	{
 		CNetworkConnection::Get()->Start(CConfig::Get()->MaxPlayers, CConfig::Get()->Port);
 		CRPCPlugin::Get();
-		DWORD lastTick = 0;
-		RakNet::RakNetStatistics stat;
-
 		while (g_running)
 		{
 			RakSleep(5);
@@ -62,16 +59,6 @@ int main(void)
 			CNetworkPlayer::Tick();
 			CNetworkMarker::Tick();
 			Plugin::Tick();
-
-			if ((GetTickCount() - lastTick) > 100)
-			{
-				CNetworkConnection::Get()->server->GetStatistics(0, &stat);
-				std::stringstream ss;
-				ss << CConfig::Get()->Hostname << ". Players online: " << CNetworkPlayer::Count() << ", "
-					<< "Packet loss: " << std::setprecision(2) << std::fixed << stat.packetlossTotal * 100 << "%";
-				//SetConsoleTitle(ss.str().c_str());
-				lastTick = GetTickCount();
-			}
 		}
 	};
 	std::thread netThread(netLoop);

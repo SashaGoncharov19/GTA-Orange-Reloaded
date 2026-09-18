@@ -10,8 +10,27 @@ port: 7788
 # TCP port of the built-in HTTP server (defaults to port + 1)
 httpport: 7789
 
-# Maximum number of players (1-256)
+# Maximum number of players (1-4096)
 players: 32
+
+# --- Synchronisation (see docs/NETWORK.md) ---
+
+# How far (metres) a player receives other players' state. Beyond this they
+# are not streamed at all; within a fifth of it they are updated every
+# snapshot, within three fifths every second one, further out every fourth.
+# 0 streams everyone to everyone regardless of distance.
+stream_distance: 500
+
+# Snapshots per second the server sends to each player (1-60).
+sync_rate: 20
+
+# Most players inside one player's snapshot (1-255); the nearest win.
+# Bandwidth per player is roughly this * 104 bytes * sync_rate.
+max_streamed_players: 32
+
+# State packets per second accepted from one client before the surplus is
+# dropped (the game client sends 20 on foot and 30 in a vehicle).
+max_client_sync_rate: 40
 
 # Resources to start. Each entry is a folder under resources/ containing a
 # resource.yml (which names the module that runs it, e.g. "lua").

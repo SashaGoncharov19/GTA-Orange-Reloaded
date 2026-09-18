@@ -49,6 +49,14 @@ static const struct luaL_Reg mfunclib[] = {
 
 	{ "CreateVehicle", lua_CreateVehicle },
 	{ "DeleteVehicle", lua_DeleteVehicle },
+	{ "VehicleExists", lua_VehicleExists },
+	{ "GetVehicleCoords", lua_GetVehicleCoords },
+	{ "SetVehicleCoords", lua_SetVehicleCoords },
+	{ "GetVehicleRotation", lua_GetVehicleRotation },
+	{ "GetVehicleHealth", lua_GetVehicleHealth },
+	{ "GetVehicleModel", lua_GetVehicleModel },
+	{ "GetVehicleDriver", lua_GetVehicleDriver },
+	{ "GetVehicles", lua_GetVehicles },
 
 	{ "CreateObject", lua_CreateObject },
 
@@ -61,10 +69,42 @@ static const struct luaL_Reg mfunclib[] = {
 	{ "SendPlayerNotification", lua_SendPlayerNotification },
 	{ "SetPlayerInfoMsg", lua_SetPlayerInfoMsg },
 	{ "SendPlayerMessage", lua_SendPlayerMessage },
+	{ "SendMessageToAll", lua_SendMessageToAll },
 	{ "SetPlayerIntoVehicle", lua_SetPlayerIntoVehicle },
+	{ "SetPlayerModel", lua_SetPlayerModel },
+	{ "SetPlayerName", lua_SetPlayerName },
+	{ "GivePlayerAmmo", lua_GivePlayerAmmo },
+	{ "GetPlayerHealth", lua_GetPlayerHealth },
+	{ "SetPlayerHealth", lua_SetPlayerHealth },
+	{ "GetPlayerArmour", lua_GetPlayerArmour },
+	{ "SetPlayerArmour", lua_SetPlayerArmour },
+	{ "GetPlayerHeading", lua_GetPlayerHeading },
+	{ "SetPlayerHeading", lua_SetPlayerHeading },
+	{ "GetPlayerWeapon", lua_GetPlayerWeapon },
+	{ "IsPlayerInVehicle", lua_IsPlayerInVehicle },
+	{ "GetPlayerVehicle", lua_GetPlayerVehicle },
+	{ "GetPlayerSeat", lua_GetPlayerSeat },
+	{ "GetPlayerPing", lua_GetPlayerPing },
+	{ "GetPlayerAddress", lua_GetPlayerAddress },
+	{ "GetPlayerClientVersion", lua_GetPlayerClientVersion },
+	{ "IsPlayerDead", lua_IsPlayerDead },
+	{ "IsPlayerInRange", lua_IsPlayerInRange },
+	{ "KickPlayer", lua_KickPlayer },
+	{ "GetPlayerMoney", lua_GetPlayerMoney },
+	{ "SetPlayerMoney", lua_SetPlayerMoney },
+	{ "GivePlayerMoney", lua_GivePlayerMoney },
+	{ "SetPlayerColor", lua_SetPlayerColor },
+	{ "GetPlayerColor", lua_GetPlayerColor },
+	{ "GetPlayers", lua_GetPlayers },
+	{ "GetPlayerCount", lua_GetPlayerCount },
+	{ "GetMaxPlayers", lua_GetMaxPlayers },
 	
 	{ "AddClientScript", lua_LoadClientScript },
 	{ "OnTick", lua_tick },
+	{ "SetTimer", lua_SetTimer },
+	{ "SetInterval", lua_SetInterval },
+	{ "ClearTimer", lua_ClearTimer },
+	{ "GetServerTime", lua_GetServerTime },
 	{ "OnHTTPReq", lua_HTTPReq },
 	{ "OnEvent", lua_Event },
 	{ "OnCommand", lua_Command },
@@ -177,9 +217,71 @@ char* SResource::OnHTTPRequest(const char* method, const char* url, const char* 
 
 bool SResource::OnTick()
 {
+	RunTimers();
 	if (tick)
 		tick();
 	return true;
+}
+
+int SResource::AddTimer(int ref, unsigned long intervalMs, bool repeat)
+{
+	Timer t;
+	t.id = m_nextTimerId++;
+	t.ref = ref;
+	t.intervalMs = intervalMs;
+	t.dueMs = API::Get().GetServerTimeMs() + intervalMs;
+	t.repeat = repeat;
+	t.removed = false;
+	m_timers.push_back(t);
+	return t.id;
+}
+
+bool SResource::RemoveTimer(int id)
+{
+	for (Timer & t : m_timers)
+		if (t.id == id && !t.removed)
+		{
+			t.removed = true;
+			return true;
+		}
+	return false;
+}
+
+void SResource::RunTimers()
+{
+	if (m_timers.empty())
+		return;
+	unsigned long now = API::Get().GetServerTimeMs();
+	// Callbacks may add or clear timers: iterate by index over the current size.
+	size_t count = m_timers.size();
+	for (size_t i = 0; i < count; i++)
+	{
+		Timer & t = m_timers[i];
+		if (t.removed || (long)(now - t.dueMs) < 0)
+			continue;
+		if (t.repeat)
+			t.dueMs = now + t.intervalMs;
+		else
+			t.removed = true;
+		lua_rawgeti(m_lua, LUA_REGISTRYINDEX, t.ref);
+		if (lua_pcall(m_lua, 0, 0, 0) != 0)
+		{
+			std::string err = lua_tostring(m_lua, -1) ? lua_tostring(m_lua, -1) : "unknown error";
+			lua_pop(m_lua, 1);
+			API::Get().Print(("[LUA] timer: " + err).c_str());
+		}
+	}
+	// drop the finished ones and release their callbacks
+	for (size_t i = 0; i < m_timers.size();)
+	{
+		if (m_timers[i].removed)
+		{
+			luaL_unref(m_lua, LUA_REGISTRYINDEX, m_timers[i].ref);
+			m_timers.erase(m_timers.begin() + i);
+		}
+		else
+			i++;
+	}
 }
 
 bool SResource::OnPlayerCommand(long playerid, const char* cmd)

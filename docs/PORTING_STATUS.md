@@ -161,6 +161,19 @@ Tick and script id hooks pass everything through).
 4. `ReplayInterfaces`, `ViewportGame` and the gameplay patches
    (`GameProcessHooks`) have no patterns; only the debug pool overlay and the
    cosmetic patches depend on them.
+5. **Synchronisation, server side: done on 2026-09-18** (`docs/NETWORK.md`).
+   The server no longer forwards every state packet to everybody reliably;
+   it sends each player distance-tiered `ID_PLAYER_SNAPSHOT` batches at
+   `sync_rate`, in datagrams that fit the MTU, unreliable on their own
+   channel, and `ID_PLAYER_INFO` records for who is who. Packets from
+   connections that never completed the handshake are dropped instead of
+   creating ghost players. Measured with `orange_bot`: 1000 players at
+   20 Hz cost about a tenth of a core. **Client side: still the 2017
+   path** - `orange-core` sends every frame, reliable ordered, and handles
+   `ID_SEND_PLAYER_DATA` from the old relay only; the server keeps that
+   relay for clients that announce protocol 1, so the current client
+   still sees the others, at the old cost. Consuming the snapshots is the
+   next round.
 
 ## 5. Natives crossmap: how it works and how to redo it
 

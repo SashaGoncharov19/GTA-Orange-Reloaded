@@ -96,6 +96,8 @@ int main(int argc, char ** argv)
 				RakNet::BitStream out;
 				out.Write((unsigned char)ID_CONNECT_TO_SERVER);
 				out.Write(RakNet::RakString(nickname));
+				out.Write(RakNet::RakString("orange_handshake"));
+				out.Write((unsigned int)2);   // ORANGE_PROTOCOL_VERSION (shared/NetworkTypes.h)
 				client->Send(&out, HIGH_PRIORITY, RELIABLE_ORDERED, 0, p->systemAddress, false);
 			}
 			else if (id == ID_CONNECT_TO_SERVER)

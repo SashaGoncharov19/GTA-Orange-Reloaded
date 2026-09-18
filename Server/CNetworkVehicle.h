@@ -19,7 +19,12 @@ public:
 	bool bDrivable = true;
 
 	RakNetGUID driverGUID;
-	bool hasDriver;
+	bool hasDriver = false;
+	unsigned long ulLastUpdateMs = 0;   // server clock, when a client last sent this vehicle's state
+
+	// Whether a packet about this vehicle from `from` is the driver's (or the
+	// vehicle is free, or the previous driver went quiet for two seconds).
+	bool AcceptsStateFrom(RakNetGUID from, unsigned long nowMs);
 
 	static std::vector<CNetworkVehicle *> All();
 	static void SendGlobal(RakNet::Packet * packet);

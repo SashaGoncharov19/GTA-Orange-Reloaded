@@ -1,4 +1,4 @@
-// lua-module.cpp: определяет экспортированные функции для приложения DLL.
+// lua-module.cpp: module entry points exported to orange_server (see shared/ModuleAPI.h).
 //
 
 #include "stdafx.h"
@@ -6,7 +6,6 @@
 #define EXPORT ORANGE_EXPORT
 
 API * API::instance = nullptr;
-Player players[256];
 
 extern "C"
 {
@@ -40,8 +39,7 @@ extern "C"
 
 	EXPORT bool OnPlayerConnect(long playerid)
 	{
-		players[playerid].exists = true;
-		return true; //SResource::Get()->OnPlayerConnect(playerid);
+		return true;
 	}
 
 	EXPORT char* OnHTTPRequest(const char* method, const char* url, const char* query, std::string body)
@@ -56,7 +54,6 @@ extern "C"
 
 	EXPORT bool OnPlayerDisconnect(long playerid, int reason)
 	{
-		players[playerid].exists = false;
 		return true;
 	}
 

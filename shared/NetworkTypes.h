@@ -1,5 +1,21 @@
 #pragma once
 
+// Wire protocol facts shared by orange_server, orange-core and the tools.
+//
+// State (positions, rotations, health, ...) goes UNRELIABLE_SEQUENCED on
+// ORANGE_CHANNEL_STATE: a lost snapshot must never be retransmitted, the next
+// one is newer anyway. Everything else (RPC, chat, player info) stays
+// RELIABLE_ORDERED on channel 0.
+enum
+{
+	ORANGE_CHANNEL_RELIABLE = 0,
+	ORANGE_CHANNEL_STATE = 1,
+	ORANGE_PROTOCOL_VERSION = 2,          // ID_CONNECT_TO_SERVER carries name, then client version + this
+	ORANGE_CLIENT_SYNC_RATE_ON_FOOT = 20, // Hz, what a client sends while on foot
+	ORANGE_CLIENT_SYNC_RATE_VEHICLE = 30, // Hz, while driving
+	ORANGE_MAX_SNAPSHOT_ENTRIES = 255     // per ID_PLAYER_SNAPSHOT (uint8 count)
+};
+
 enum
 {
 	TASK_TYPE_PRIMARY = 0,
@@ -161,6 +177,15 @@ public:
 		return ss.str();
 	}
 };
+
+// The sync structures cross the wire as raw bytes (BitStream::Write of the
+// object). The client is built with MSVC, the server with GCC or clang: the
+// layouts were compared (clang -target x86_64-pc-windows-msvc against
+// x86_64-linux-gnu) and match only while DWORD is 32 bits on both sides and
+// nothing is inserted in the middle. Any drift fails the build here instead of
+// scrambling positions at run time.
+static_assert(sizeof(OnFootSyncData) == 96, "OnFootSyncData wire layout changed: update both sides and this check");
+static_assert(sizeof(VehicleData) == 120, "VehicleData wire layout changed: update both sides and this check");
 
 class CSyncDataLogger
 {

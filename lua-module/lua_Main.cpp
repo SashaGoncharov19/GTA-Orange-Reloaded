@@ -203,3 +203,40 @@ int lua_Delete3DTextToPlayer(lua_State *L)
 	API::Get().Delete3DText(lua_tointeger(L, 1));
 	return 0;
 }
+
+
+// SetTimer(ms, fn) -> id: fn runs once after ms milliseconds.
+int lua_SetTimer(lua_State *L)
+{
+	unsigned long ms = (unsigned long)luaL_checknumber(L, 1);
+	luaL_checktype(L, 2, LUA_TFUNCTION);
+	lua_pushvalue(L, 2);
+	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	lua_pushinteger(L, SResource::Get()->AddTimer(ref, ms, false));
+	return 1;
+}
+
+// SetInterval(ms, fn) -> id: fn runs every ms milliseconds until ClearTimer(id).
+int lua_SetInterval(lua_State *L)
+{
+	unsigned long ms = (unsigned long)luaL_checknumber(L, 1);
+	if (ms < 1) ms = 1;
+	luaL_checktype(L, 2, LUA_TFUNCTION);
+	lua_pushvalue(L, 2);
+	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	lua_pushinteger(L, SResource::Get()->AddTimer(ref, ms, true));
+	return 1;
+}
+
+int lua_ClearTimer(lua_State *L)
+{
+	lua_pushboolean(L, SResource::Get()->RemoveTimer((int)luaL_checkinteger(L, 1)));
+	return 1;
+}
+
+// GetServerTime() -> milliseconds since the server started (monotonic).
+int lua_GetServerTime(lua_State *L)
+{
+	lua_pushnumber(L, (lua_Number)API::Get().GetServerTimeMs());
+	return 1;
+}

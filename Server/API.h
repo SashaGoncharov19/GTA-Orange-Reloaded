@@ -35,8 +35,8 @@ public:
 
 	//Vehicle
 	unsigned long CreateVehicle(long hash, float x, float y, float z, float heading);
-	bool SetVehiclePosition(int vehicleid, float x, float y, float z);
-	CVector3 GetVehiclePosition(int vehicleid);
+	bool SetVehiclePosition(unsigned long vehicle, float x, float y, float z);
+	CVector3 GetVehiclePosition(unsigned long vehicle);
 	bool DeleteVehicle(unsigned long guid);
 
 	bool CreatePickup(int type, float x, float y, float z, float scale);
@@ -69,6 +69,29 @@ public:
 	//World
 	void Print(const char * message);
 	long Hash(const char * str);
+
+	// 2026 additions (see ModuleAPI.h)
+	bool PlayerExists(long playerid);
+	long GetPlayerCount();
+	long GetMaxPlayers();
+	std::vector<long> GetPlayers();
+	float GetPlayerHeading(long playerid);
+	bool IsPlayerInVehicle(long playerid);
+	unsigned long GetPlayerVehicle(long playerid);
+	int GetPlayerSeat(long playerid);
+	int GetPlayerPing(long playerid);
+	std::string GetPlayerAddress(long playerid);
+	std::string GetPlayerClientVersion(long playerid);
+	long GetPlayerWeapon(long playerid);
+	bool IsPlayerDead(long playerid);
+	bool KickPlayer(long playerid, const char * reason);
+	bool VehicleExists(unsigned long vehicle);
+	std::vector<unsigned long> GetVehicles();
+	long GetVehicleModel(unsigned long vehicle);
+	long GetVehicleDriver(unsigned long vehicle);
+	CVector3 GetVehicleRotation(unsigned long vehicle);
+	float GetVehicleHealth(unsigned long vehicle);
+	unsigned long GetServerTimeMs();
 
 	static API * Get()
 	{
