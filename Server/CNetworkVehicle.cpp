@@ -63,9 +63,15 @@ void CNetworkVehicle::SetHealth(unsigned short health)
 	usHealth = health;
 }
 
+bool CNetworkVehicle::AcceptsStateFrom(RakNetGUID from, unsigned long nowMs)
+{
+	if (!hasDriver || driverGUID == UNASSIGNED_RAKNET_GUID || driverGUID == from)
+		return true;
+	return nowMs - ulLastUpdateMs > 2000;
+}
+
 void CNetworkVehicle::SetVehicleData(const VehicleData & data)
 {
-	rnGUID = data.GUID;
 	vecPos = data.vecPos;
 	vecRot = data.vecRot;
 	usHealth = data.usHealth;
@@ -79,7 +85,9 @@ void CNetworkVehicle::SetVehicleData(const VehicleData & data)
 
 	if (hasDriver)
 	{
-		CNetworkPlayer::GetByGUID(data.driver)->SetCoords(vecPos);
+		CNetworkPlayer * driverPlayer = CNetworkPlayer::GetByGUID(data.driver);
+		if (driverPlayer)
+			driverPlayer->SetCoords(vecPos);
 	}
 }
 
@@ -102,8 +110,7 @@ void CNetworkVehicle::GetVehicleData(VehicleData & data)
 
 CNetworkVehicle::~CNetworkVehicle()
 {
-	for (int i = 0; i < Vehicles.size(); i++)
-		if (Vehicles[i]->rnGUID == rnGUID) Vehicles.erase(Vehicles.begin() + i, Vehicles.begin() + i + 1);
+	Vehicles.erase(std::remove(Vehicles.begin(), Vehicles.end(), this), Vehicles.end());
 }
 
 std::vector<CNetworkVehicle *> CNetworkVehicle::All()

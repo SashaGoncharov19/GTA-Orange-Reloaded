@@ -61,12 +61,16 @@ the way the game client does and reports whether the server accepted the
 player, without starting the game. Use it to check ports and firewalls from
 another machine; the CI smoke tests run it too.
 
-Configuration lives in `config.yml` (name, ports, max players, resources).
+Configuration lives in `config.yml` (name, ports, max players, resources,
+and the synchronisation keys `stream_distance`, `sync_rate`,
+`max_streamed_players`, `max_client_sync_rate`).
 Resources are folders under `resources/` with a `resource.yml` and, for Lua
 resources, a `main.lua` - see `resources/example/` for a commented example
 that spawns cars, handles events and chat commands and answers HTTP requests.
-Server events, commands and the whole API exposed to Lua are listed in
-`modules/lua-module/API.lua` and `lua-module/SResource.cpp`.
+Every Lua function, event and callback is documented in
+[docs/SERVER_SCRIPTING.md](docs/SERVER_SCRIPTING.md); the wire protocol,
+the streaming rules and the load test (`orange_bot`, also next to the
+server) in [docs/NETWORK.md](docs/NETWORK.md).
 
 ### Client
 

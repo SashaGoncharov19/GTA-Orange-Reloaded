@@ -161,6 +161,25 @@ Tick and script id hooks pass everything through).
 4. `ReplayInterfaces`, `ViewportGame` and the gameplay patches
    (`GameProcessHooks`) have no patterns; only the debug pool overlay and the
    cosmetic patches depend on them.
+5. **Synchronisation, server side: done on 2026-09-18** (`docs/NETWORK.md`).
+   The server no longer forwards every state packet to everybody reliably;
+   it sends each player distance-tiered `ID_PLAYER_SNAPSHOT` batches at
+   `sync_rate`, in datagrams that fit the MTU, unreliable on their own
+   channel, and `ID_PLAYER_INFO` records for who is who. Packets from
+   connections that never completed the handshake are dropped instead of
+   creating ghost players. Measured with `orange_bot`: 1000 players at
+   20 Hz cost about a tenth of a core. **Client side: done the same day.**
+   `orange-core` announces its version and protocol 2, sends its state 20
+   times a second on foot and 30 in a vehicle (unreliable, own channel,
+   instead of every frame reliable-ordered), consumes `ID_PLAYER_INFO` and
+   `ID_PLAYER_SNAPSHOT` (a remote ped appears where the player is the first
+   time it is streamed, is interpolated over the measured update interval,
+   and goes away after 10 s without state), and still understands the 2017
+   relay from an older server. The remote-ped code no longer writes the
+   2017 `CPed` fields (`Flags`, `MoveSpeed`) or the 2017 `CVehicle` offsets
+   (steering, RPM) off the reference build; name tags read position and
+   max health through natives. `SetVehicleCoords` from a script now moves
+   the vehicle on the clients (`SetVehiclePos` RPC).
 
 ## 5. Natives crossmap: how it works and how to redo it
 

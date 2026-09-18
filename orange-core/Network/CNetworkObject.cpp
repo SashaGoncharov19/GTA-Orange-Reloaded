@@ -220,9 +220,13 @@ void CNetworkObject::SetObjectData(ObjectData data, unsigned long ulDelay)
 {
 	m_hasDriver = data.hasDriver;
 	if (m_hasDriver && data.driver != UNASSIGNED_RAKNET_GUID) {
-		CNetworkPlayer *pl = CNetworkPlayer::GetByGUID(data.driver);
-		m_Driver = pl->GetHandle();
-		if (PED::GET_Object_PED_IS_IN(m_Driver, false) != Handle) m_hasDriver = false;
+		CNetworkPlayer *pl = CNetworkPlayer::GetByGUID(data.driver, false);
+		if (!pl) m_hasDriver = false;   // driver not streamed in here
+		else
+		{
+			m_Driver = pl->GetHandle();
+			if (PED::GET_Object_PED_IS_IN(m_Driver, false) != Handle) m_hasDriver = false;
+		}
 	}
 	else m_hasDriver = false;
 

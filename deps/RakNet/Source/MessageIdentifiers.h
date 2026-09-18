@@ -438,6 +438,11 @@ enum DefaultMessageIDTypes
 
 	ID_SEND_TASKS,
 
+	// GTA:Orange, 2026: batched state from the server (unreliable, sequenced)
+	// and the reliable "who is this GUID" record (name, model).
+	ID_PLAYER_SNAPSHOT,
+	ID_PLAYER_INFO,
+
 	ID_USER_PACKET_ENUM
 	//-------------------------------------------------------------------------------------------------------------
  

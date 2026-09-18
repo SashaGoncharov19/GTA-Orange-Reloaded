@@ -1,6 +1,21 @@
 #include "stdafx.h"
 
+#ifndef ORANGE_VERSION
+#define ORANGE_VERSION "dev"
+#endif
+
 CNetworkConnection *CNetworkConnection::singleInstance = nullptr;
+
+// Interpolate a remote player over the interval its updates actually arrive
+// at, within sane bounds: the server sends 20 snapshots a second to a player
+// nearby, fewer to one far away.
+static unsigned long InterpolationDelay(CNetworkPlayer * player)
+{
+	int delay = player->GetTickTime();
+	if (delay < 50) delay = 50;
+	else if (delay > 200) delay = 200;
+	return (unsigned long)delay;
+}
 
 CNetworkConnection::CNetworkConnection()
 {
@@ -87,6 +102,10 @@ void CNetworkConnection::Tick()
 				RakString playerName(CConfig::Get()->sNickName.c_str());
 				bsOut.Write((unsigned char)ID_CONNECT_TO_SERVER);
 				bsOut.Write(playerName);
+				// who we are, so that the server can serve older clients
+				// the old way and log what connects
+				bsOut.Write(RakString(ORANGE_VERSION));
+				bsOut.Write((unsigned int)ORANGE_PROTOCOL_VERSION);
 				CLocalPlayer::Get()->SetMoney(0);
 
 				client->Send(&bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false);
@@ -111,19 +130,20 @@ void CNetworkConnection::Tick()
 				break;
 			}
 			case ID_DISCONNECTION_NOTIFICATION:
-			{
-				log_info << "Network: the server closed the connection" << std::endl;
-				CLocalPlayer::Get()->SetMoney(0);
-				bEstablished = false;
-				CChat::Get()->AddChatMessage("Connection closed!");
-				break;
-			}
 			case ID_CONNECTION_LOST:
 			{
-				log_error << "Network: connection to " << Address() << " lost" << std::endl;
+				bool closed = packetID == ID_DISCONNECTION_NOTIFICATION;
+				if (closed)
+					log_info << "Network: the server closed the connection" << std::endl;
+				else
+					log_error << "Network: connection to " << Address() << " lost" << std::endl;
 				CLocalPlayer::Get()->SetMoney(0);
 				bEstablished = false;
-				CChat::Get()->AddChatMessage("Connection Lost!");
+				bConnected = false;
+				// the others are gone with the session
+				CNetworkPlayer::Clear();
+				CChat::Get()->AddChatMessage(closed ? "Connection closed!" : "Connection lost!", { 255, 100, 100, 255 });
+				CGlobals::Get().displayServerBrowser = true;
 				break;
 			}
 			case ID_CONNECTION_BANNED:
@@ -144,20 +164,87 @@ void CNetworkConnection::Tick()
 					CLocalPlayer::Get()->Spawn();
 				break;
 			}
+			case ID_PLAYER_INFO:
+			{
+				// who is who; a snapshot with this player can arrive before
+				// or after this record (different channels)
+				RakNet::RakNetGUID guid;
+				unsigned int id = 0;
+				RakNet::RakString name;
+				RemotePlayerInfo info;
+				bsIn.Read(guid);
+				bsIn.Read(id);
+				bsIn.Read(name);
+				bsIn.Read(info.model);
+				bsIn.Read(info.color);
+				info.id = id;
+				info.name = name.C_String();
+				CNetworkPlayer::Remember(guid, info);
+				if (CNetworkPlayer * player = CNetworkPlayer::GetByGUID(guid, false))
+				{
+					player->SetName(info.name);
+					player->SetId(id);
+					player->SetColor(info.color);
+				}
+				log_debug << "Network: player " << id << " '" << info.name << "' is online (" << CNetworkPlayer::KnownCount() << " known)" << std::endl;
+				break;
+			}
+			case ID_PLAYER_SNAPSHOT:
+			{
+				// the states of the players around us, see docs/NETWORK.md
+				unsigned int serverTime = 0;
+				unsigned char count = 0;
+				bsIn.Read(serverTime);
+				bsIn.Read(count);
+				for (unsigned char i = 0; i < count; i++)
+				{
+					RakNet::RakNetGUID guid;
+					OnFootSyncData data;
+					if (!bsIn.Read(guid) || !bsIn.Read(data))
+						break;
+					if (guid == client->GetMyGUID())
+						continue;
+					CNetworkPlayer *remotePlayer = CNetworkPlayer::GetByGUID(guid, false);
+					if (!remotePlayer)
+					{
+						// first sight: the ped appears where the player is
+						CNetworkPlayer::hFutureModel = data.hModel;
+						CNetworkPlayer::vecFuturePosition = data.vecPos;
+						remotePlayer = CNetworkPlayer::GetByGUID(guid, true);
+					}
+					if (!remotePlayer->AcceptServerTime(serverTime))
+						continue;   // overtaken by a newer datagram
+					remotePlayer->UpdateLastTickTime();
+					remotePlayer->SetOnFootData(data, InterpolationDelay(remotePlayer));
+					if (data.bShooting)
+						remotePlayer->Interpolate();
+				}
+				break;
+			}
 			case ID_SEND_PLAYER_DATA:
 			{
+				// the 2017 relay (GUID, name, state), from a server that has
+				// not been updated to snapshots
 				OnFootSyncData data;
 				RakNet::RakNetGUID playerGUID;
 				RakNet::RakString rsName;
 				bsIn.Read(playerGUID);
 				bsIn.Read(rsName);
 				bsIn.Read(data);
-				CNetworkPlayer::hFutureModel = data.hModel;
-				CNetworkPlayer *remotePlayer = CNetworkPlayer::GetByGUID(playerGUID);
+				if (playerGUID == client->GetMyGUID())
+					break;
+				CNetworkPlayer *remotePlayer = CNetworkPlayer::GetByGUID(playerGUID, false);
+				if (!remotePlayer)
+				{
+					CNetworkPlayer::hFutureModel = data.hModel;
+					CNetworkPlayer::vecFuturePosition = data.vecPos;
+					remotePlayer = CNetworkPlayer::GetByGUID(playerGUID, true);
+				}
 				if(rsName.GetLength())
 					remotePlayer->SetName(std::string(rsName.C_String()));
+				remotePlayer->MarkHasState();
 				remotePlayer->UpdateLastTickTime();
-				remotePlayer->SetOnFootData(data, 100); //remotePlayer->GetTickTime());
+				remotePlayer->SetOnFootData(data, InterpolationDelay(remotePlayer));
 				if (data.bShooting)
 					remotePlayer->Interpolate();
 				break;
@@ -185,7 +272,7 @@ void CNetworkConnection::Tick()
 			{
 				RakNet::RakNetGUID playerGUID;
 				bsIn.Read(playerGUID);
-				CNetworkPlayer * player = CNetworkPlayer::GetByGUID(playerGUID);
+				CNetworkPlayer * player = CNetworkPlayer::GetByGUID(playerGUID, false);
 				std::vector<TaskPair> ClonedTasks;
 				int parentTaskID = -1;
 				if (player)
@@ -266,13 +353,16 @@ void CNetworkConnection::Tick()
 				RakNet::RakNetGUID guid;
 				bsIn.Read(guid);
 				CNetworkPlayer::DeleteByGUID(guid);
+				CNetworkPlayer::Forget(guid);
 				break;
 			}
 			default:
 			{
-				std::stringstream ss;
-				ss << "[RakNet] Unknown message id: " << (int)packet->data[0] << ", message: " << packet->data;
-				CChat::Get()->AddChatMessage(ss.str(), { 255, 100, 100, 255 });
+				// once per identifier, in the log: the payload is binary and
+				// the chat is no place for it
+				static std::set<unsigned char> said;
+				if (said.insert(packetID).second)
+					log_info << "Network: unknown message id " << (int)packetID << " (" << packet->length << " bytes) from the server, ignored from now on" << std::endl;
 				break;
 			}
 		}

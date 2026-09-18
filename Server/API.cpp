@@ -131,7 +131,7 @@ std::string API::GetPlayerName(long playerid)
 {
 	auto player = CNetworkPlayer::GetByID(playerid);
 	if (!player)
-		return "wtf?";
+		return "";
 	return player->GetName();
 }
 
@@ -223,8 +223,11 @@ bool API::SendClientMessage(long playerid, const char * message, unsigned int co
 
 bool API::SetPlayerIntoVehicle(long playerid, unsigned long vehicle, char seat)
 {
+	auto player = CNetworkPlayer::GetByID(playerid);
+	if (!player)
+		return false;
 	RakNet::BitStream bsOut;
-	bsOut.Write(CNetworkPlayer::GetByID(playerid)->GetGUID());
+	bsOut.Write(player->GetGUID());
 	bsOut.Write(RakNetGUID(vehicle));
 	bsOut.Write(seat);
 	CRPCPlugin::Get()->Signal("SetPlayerIntoVehicle", &bsOut, HIGH_PRIORITY, RELIABLE_SEQUENCED, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true, false);
@@ -237,16 +240,25 @@ unsigned long API::CreateVehicle(long hash, float x, float y, float z, float hea
 	return RakNetGUID::ToUint32(veh->GetGUID()); // (new CNetworkVehicle(hash, x, y, z, heading));
 }
 
-bool API::SetVehiclePosition(int vehicleid, float x, float y, float z)
+bool API::SetVehiclePosition(unsigned long vehicle, float x, float y, float z)
 {
-	log << "Not implemented" << std::endl;
+	auto veh = CNetworkVehicle::GetByGUID(RakNetGUID(vehicle));
+	if (!veh)
+		return false;
+	veh->SetPosition(CVector3(x, y, z));
+	RakNet::BitStream bsOut;
+	bsOut.Write(veh->GetGUID());
+	bsOut.Write(CVector3(x, y, z));
+	CRPCPlugin::Get()->Signal("SetVehiclePos", &bsOut, HIGH_PRIORITY, RELIABLE_SEQUENCED, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true, false);
 	return true;
 }
 
-CVector3 API::GetVehiclePosition(int vehicleid)
+CVector3 API::GetVehiclePosition(unsigned long vehicle)
 {
-	log << "Not implemented" << std::endl;
-	return CVector3(0, 0, 0);
+	auto veh = CNetworkVehicle::GetByGUID(RakNetGUID(vehicle));
+	if (!veh)
+		return CVector3(0, 0, 0);
+	return veh->GetPosition();
 }
 
 bool API::DeleteVehicle(unsigned long guid)
@@ -399,6 +411,8 @@ unsigned long API::Create3DText(const char * text, float x, float y, float z, in
 unsigned long API::Create3DTextForPlayer(unsigned long player, const char * text, float x, float y, float z, int color, int outColor)
 {
 	auto pl = CNetworkPlayer::GetByGUID(RakNetGUID(player));
+	if (!pl)
+		return 0;
 	CNetwork3DText * blip = new CNetwork3DText(x, y, z, color, outColor, text, pl->GetID());
 	return RakNetGUID::ToUint32(blip->rnGUID);
 }
@@ -465,4 +479,150 @@ long API::Hash(const char * str)
 	value = temp2 + temp;
 	if (value < 2) value += 2;
 	return value;
+}
+
+
+// ---------------------------------------------------------------------------
+// 2026 additions
+// ---------------------------------------------------------------------------
+
+bool API::PlayerExists(long playerid)
+{
+	return playerid >= 0 && CNetworkPlayer::GetByID(playerid) != nullptr;
+}
+
+long API::GetPlayerCount()
+{
+	return (long)CNetworkPlayer::Count();
+}
+
+long API::GetMaxPlayers()
+{
+	return CConfig::Get()->MaxPlayers;
+}
+
+std::vector<long> API::GetPlayers()
+{
+	std::vector<long> ids;
+	for (CNetworkPlayer * player : CNetworkPlayer::All())
+		if (player)
+			ids.push_back((long)player->GetID());
+	return ids;
+}
+
+float API::GetPlayerHeading(long playerid)
+{
+	auto player = CNetworkPlayer::GetByID(playerid);
+	return player ? player->GetHeading() : 0.f;
+}
+
+bool API::IsPlayerInVehicle(long playerid)
+{
+	auto player = CNetworkPlayer::GetByID(playerid);
+	return player && player->bInVehicle;
+}
+
+unsigned long API::GetPlayerVehicle(long playerid)
+{
+	auto player = CNetworkPlayer::GetByID(playerid);
+	if (!player || !player->bInVehicle || player->vehicle == UNASSIGNED_RAKNET_GUID)
+		return 0;
+	return RakNetGUID::ToUint32(player->vehicle);
+}
+
+int API::GetPlayerSeat(long playerid)
+{
+	auto player = CNetworkPlayer::GetByID(playerid);
+	if (!player || !player->bInVehicle)
+		return -2;
+	return player->cSeat;
+}
+
+int API::GetPlayerPing(long playerid)
+{
+	auto player = CNetworkPlayer::GetByID(playerid);
+	if (!player)
+		return -1;
+	return CNetworkConnection::Get()->server->GetAveragePing(player->GetGUID());
+}
+
+std::string API::GetPlayerAddress(long playerid)
+{
+	auto player = CNetworkPlayer::GetByID(playerid);
+	if (!player)
+		return "";
+	return player->GetAddress().ToString(true);
+}
+
+std::string API::GetPlayerClientVersion(long playerid)
+{
+	auto player = CNetworkPlayer::GetByID(playerid);
+	return player ? player->GetClientVersion() : "";
+}
+
+long API::GetPlayerWeapon(long playerid)
+{
+	auto player = CNetworkPlayer::GetByID(playerid);
+	return player ? (long)player->GetWeapon() : 0;
+}
+
+bool API::IsPlayerDead(long playerid)
+{
+	auto player = CNetworkPlayer::GetByID(playerid);
+	return player && player->IsDead();
+}
+
+bool API::KickPlayer(long playerid, const char * reason)
+{
+	auto player = CNetworkPlayer::GetByID(playerid);
+	if (!player)
+		return false;
+	CNetworkConnection::Get()->Kick(player, reason ? reason : "kicked");
+	return true;
+}
+
+bool API::VehicleExists(unsigned long vehicle)
+{
+	return CNetworkVehicle::GetByGUID(RakNetGUID(vehicle)) != nullptr;
+}
+
+std::vector<unsigned long> API::GetVehicles()
+{
+	std::vector<unsigned long> ids;
+	for (CNetworkVehicle * veh : CNetworkVehicle::All())
+		if (veh)
+			ids.push_back(RakNetGUID::ToUint32(veh->GetGUID()));
+	return ids;
+}
+
+long API::GetVehicleModel(unsigned long vehicle)
+{
+	auto veh = CNetworkVehicle::GetByGUID(RakNetGUID(vehicle));
+	return veh ? (long)veh->hashModel : 0;
+}
+
+long API::GetVehicleDriver(unsigned long vehicle)
+{
+	auto veh = CNetworkVehicle::GetByGUID(RakNetGUID(vehicle));
+	if (!veh || !veh->hasDriver)
+		return -1;
+	auto player = CNetworkPlayer::GetByGUID(veh->driverGUID);
+	return player ? (long)player->GetID() : -1;
+}
+
+CVector3 API::GetVehicleRotation(unsigned long vehicle)
+{
+	auto veh = CNetworkVehicle::GetByGUID(RakNetGUID(vehicle));
+	return veh ? veh->vecRot : CVector3(0, 0, 0);
+}
+
+float API::GetVehicleHealth(unsigned long vehicle)
+{
+	auto veh = CNetworkVehicle::GetByGUID(RakNetGUID(vehicle));
+	return veh ? (float)veh->usHealth : 0.f;
+}
+
+unsigned long API::GetServerTimeMs()
+{
+	return (unsigned long)RakNet::GetTimeMS();
 }

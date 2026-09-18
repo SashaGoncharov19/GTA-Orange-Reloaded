@@ -64,7 +64,8 @@ void CNetworkObject::SetHealth(unsigned short health)
 
 	if (hasDriver)
 	{
-		CNetworkPlayer::GetByGUID(data.driver)->SetCoords(vecPos);
+		if (CNetworkPlayer * driverPlayer = CNetworkPlayer::GetByGUID(data.driver))
+			driverPlayer->SetCoords(vecPos);
 	}
 }*/
 

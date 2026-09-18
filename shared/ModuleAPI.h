@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "CVector3.h"
 
@@ -109,8 +110,8 @@ public:
 	//virtual bool VehicleExists(long playerid) = 0;
 	virtual unsigned long CreateVehicle(long hash, float x, float y, float z, float heading) = 0;
 	virtual bool DeleteVehicle(unsigned long guid) = 0;
-	virtual bool SetVehiclePosition(int vehicleid, float x, float y, float z) = 0;
-	virtual CVector3 GetVehiclePosition(int vehicleid) = 0;
+	virtual bool SetVehiclePosition(unsigned long vehicle, float x, float y, float z) = 0;
+	virtual CVector3 GetVehiclePosition(unsigned long vehicle) = 0;
 
 	virtual unsigned long CreateObject(long model, float x, float y, float z, float pitch, float yaw, float roll) = 0;
 
@@ -136,4 +137,29 @@ public:
 	virtual bool Attach3DTextToPlayer(unsigned long textId, unsigned long player, float oX, float oY, float oZ) = 0;
 	virtual bool Set3DTextContent(unsigned long textId, const char * text) = 0;
 	virtual bool Delete3DText(unsigned long textId) = 0;
+
+	// --- 2026 additions. Appended: the vtable order of everything above is
+	// unchanged, so a module built against the older header still calls the
+	// right functions for what it knows.
+	virtual bool PlayerExists(long playerid) = 0;
+	virtual long GetPlayerCount() = 0;
+	virtual long GetMaxPlayers() = 0;
+	virtual std::vector<long> GetPlayers() = 0;
+	virtual float GetPlayerHeading(long playerid) = 0;
+	virtual bool IsPlayerInVehicle(long playerid) = 0;
+	virtual unsigned long GetPlayerVehicle(long playerid) = 0;     // 0 when on foot
+	virtual int GetPlayerSeat(long playerid) = 0;                  // -1 driver, 0.. passengers, -2 none
+	virtual int GetPlayerPing(long playerid) = 0;                  // ms, -1 unknown
+	virtual std::string GetPlayerAddress(long playerid) = 0;       // "ip|port"
+	virtual std::string GetPlayerClientVersion(long playerid) = 0;
+	virtual long GetPlayerWeapon(long playerid) = 0;               // weapon hash the client holds
+	virtual bool IsPlayerDead(long playerid) = 0;
+	virtual bool KickPlayer(long playerid, const char * reason) = 0;
+	virtual bool VehicleExists(unsigned long vehicle) = 0;
+	virtual std::vector<unsigned long> GetVehicles() = 0;
+	virtual long GetVehicleModel(unsigned long vehicle) = 0;
+	virtual long GetVehicleDriver(unsigned long vehicle) = 0;      // player id, -1 when none
+	virtual CVector3 GetVehicleRotation(unsigned long vehicle) = 0;
+	virtual float GetVehicleHealth(unsigned long vehicle) = 0;
+	virtual unsigned long GetServerTimeMs() = 0;
 };

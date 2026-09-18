@@ -377,7 +377,10 @@ void Plugin::KeyEvent(RakNet::BitStream *bitStream, RakNet::Packet *packet)
 {
     DWORD keycode;
     bitStream->Read(keycode);
-    Plugin::Trigger("keyPress", (unsigned long)CNetworkPlayer::GetByGUID(packet->guid)->GetID(), (unsigned long)keycode);
+    CNetworkPlayer * player = CNetworkPlayer::GetByGUID(packet->guid);
+    if (!player)
+        return;
+    Plugin::Trigger("keyPress", (unsigned long)player->GetID(), (unsigned long)keycode);
 }
 
 void Plugin::ServerEvent(RakNet::BitStream *bitStream, RakNet::Packet *packet)

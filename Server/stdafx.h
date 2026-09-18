@@ -10,6 +10,10 @@
 #include <locale>
 #include <vector>
 #include <map>
+#include <unordered_map>
+#include <set>
+#include <algorithm>
+#include <chrono>
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -64,6 +68,7 @@ typedef unsigned long ULONG;
 #include <Gets.h>
 #include <WindowsIncludes.h>
 #include <GetTime.h>
+#include <MTUSize.h>
 #include <RPC4Plugin.h>
 using namespace RakNet;
 

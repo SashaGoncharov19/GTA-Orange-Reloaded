@@ -31,6 +31,10 @@ CConfig::CConfig()
 		else doc["httpport"] >> HTTPPort;
 		if (!doc.FindValue("players")) MaxPlayers = 128;
 		else doc["players"] >> MaxPlayers;
+		if (doc.FindValue("stream_distance")) doc["stream_distance"] >> StreamDistance;
+		if (doc.FindValue("sync_rate")) doc["sync_rate"] >> SyncRate;
+		if (doc.FindValue("max_streamed_players")) doc["max_streamed_players"] >> MaxStreamedPlayers;
+		if (doc.FindValue("max_client_sync_rate")) doc["max_client_sync_rate"] >> MaxClientSyncRate;
 
 		const YAML::Node& resources = doc["resources"];
 
@@ -40,10 +44,14 @@ CConfig::CConfig()
 			Resources.push_back(res);
 		}
 	}
-	if (MaxPlayers > 256) {
-		log << "Only 256 players supported, set players to 256" << std::endl;
-		MaxPlayers = 256;
+	if (MaxPlayers > 4096) {
+		log << "players: at most 4096 connections, set to 4096" << std::endl;
+		MaxPlayers = 4096;
 	}
+	if (SyncRate < 1) SyncRate = 1;
+	if (SyncRate > 60) SyncRate = 60;
+	if (MaxStreamedPlayers > ORANGE_MAX_SNAPSHOT_ENTRIES) MaxStreamedPlayers = ORANGE_MAX_SNAPSHOT_ENTRIES;
+	if (StreamDistance < 0.f) StreamDistance = 0.f;
 
 	char buffer[MAX_PATH];
 #ifdef _WIN32

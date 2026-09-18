@@ -1,5 +1,15 @@
 #pragma once
 
+// What the server said about a player (ID_PLAYER_INFO). Kept for as long as
+// the player is online, whether or not its ped is streamed in right now.
+struct RemotePlayerInfo
+{
+	unsigned int id = 0;
+	std::string name;
+	Hash model = 0;
+	color_t color = { 0xFF, 0x8F, 0x00, 0xFF };
+};
+
 struct tag_t {
 	bool bVisible;
 	float health, distance;
@@ -12,6 +22,7 @@ class CNetworkPlayer: public CPedestrian
 {
 private:
 	static std::vector<CNetworkPlayer *> PlayersPool;
+	static std::unordered_map<uint64_t, RemotePlayerInfo> Known;
 	struct
 	{
 		struct
@@ -70,22 +81,43 @@ private:
 	DWORD				timeEnterVehicle = 0;
 	DWORD				timeLeaveVehicle = 0;
 	unsigned short		m_Health = 200;
+	unsigned int		m_ServerTime = 0;     // server time of the last state applied
+	bool				m_HasState = false;
+	unsigned int		m_Id = 0;
+	color_t				m_Color = { 0xFF, 0x8F, 0x00, 0xFF };
 	tag_t				tag;
 	std::queue<std::function<void()>> taskQueue;
-	CNetworkPlayer();
+	CNetworkPlayer(RakNet::RakNetGUID guid);
 public:
-	CPed* pedHandler;
+	CPed* pedHandler = nullptr;
 	short m_Seat;
 	short m_FutureSeat;
 	static int ignoreTasks;
-	static Hash hFutureModel;
+	static Hash hFutureModel;            // model of the next ped created
+	static CVector3 vecFuturePosition;   // and where it appears
 	static std::vector<CNetworkPlayer*> All();
 	static void DeleteByGUID(RakNet::RakNetGUID guid);
-	static CNetworkPlayer * GetByGUID(RakNet::RakNetGUID GUID, bool create = true);
+	// create: make the ped (hFutureModel at vecFuturePosition, or the known
+	// model) when the player is not streamed in yet
+	static CNetworkPlayer * GetByGUID(RakNet::RakNetGUID GUID, bool create = false);
 	static bool Exists(RakNet::RakNetGUID GUID);
 	static CNetworkPlayer * GetByHandler(Entity handler);
 	static void Clear();
 	static void Tick();
+
+	// the who-is-who list from ID_PLAYER_INFO
+	static void Remember(RakNet::RakNetGUID guid, const RemotePlayerInfo & info);
+	static const RemotePlayerInfo * Info(RakNet::RakNetGUID guid);
+	static void Forget(RakNet::RakNetGUID guid);
+	static size_t KnownCount() { return Known.size(); }
+
+	// false when a state with this server time is older than the one applied
+	bool AcceptServerTime(unsigned int serverTime);
+	void MarkHasState() { m_HasState = true; }
+	bool HasState() { return m_HasState; }
+	unsigned int GetId() { return m_Id; }
+	void SetId(unsigned int id) { m_Id = id; }
+	void SetColor(color_t color) { m_Color = color; }
 	static void PreRender();
 	static void Render();
 

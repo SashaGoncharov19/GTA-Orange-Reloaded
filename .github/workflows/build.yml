@@ -68,20 +68,24 @@ jobs:
       - name: Smoke test
         run: |
           cd dist/server
-          (timeout 20 ./orange_server < /dev/null > server.log 2>&1 || true) &
+          (timeout 40 ./orange_server < /dev/null > server.log 2>&1 || true) &
           sleep 4
           curl -sf http://127.0.0.1:7789/ | tee http.txt
           grep -q "running" http.txt
           # a player connects the way the game client does
           ./orange_handshake 127.0.0.1 7788 ci-smoke | tee handshake.txt
           grep -q "accepted the player" handshake.txt
+          # twenty simulated players exchange state through the server
+          ./orange_bot --bots 20 --duration 5 --quiet | tee bot.txt
+          grep -q "RESULT: OK" bot.txt
           wait
           echo "----- server.log -----"
           cat server.log
           grep -q "Server started" server.log
           grep -q "resource started" server.log
           grep -q "player ci-smoke" server.log
-          rm -f server.log http.txt handshake.txt
+          grep -q "'bot19' joined" server.log
+          rm -f server.log http.txt handshake.txt bot.txt
 
       - name: Package
         run: tar -C dist -czf gta-orange-server-linux-x64.tar.gz server
@@ -193,6 +197,9 @@ jobs:
           # a player connects the way the game client does
           & .\orange_handshake.exe 127.0.0.1 7788 ci-smoke
           $handshake = $LASTEXITCODE
+          # twenty simulated players exchange state through the server
+          & .\orange_bot.exe --bots 20 --duration 5 --quiet
+          $bot = $LASTEXITCODE
           Stop-Process -Id $p.Id -Force
           Start-Sleep -Seconds 1
           Write-Host "----- server.log -----"
@@ -200,6 +207,7 @@ jobs:
           if ($r.Content -notmatch "running") { throw "unexpected HTTP response" }
           if (-not (Select-String -Path server.log -Pattern "Server started" -Quiet)) { throw "server did not start" }
           if ($handshake -ne 0) { throw "orange_handshake exit code ${handshake}: the server did not accept a player" }
+          if ($bot -ne 0) { throw "orange_bot exit code ${bot}: the simulated players did not receive each other's state" }
           Remove-Item stdin.txt, server.log, server.err -ErrorAction SilentlyContinue
 
       # The shell scripts end up on Linux machines; strip the CRLF that git on

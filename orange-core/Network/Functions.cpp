@@ -126,11 +126,14 @@ namespace FPlayer
 		bitStream->Read(player);
 		bitStream->Read(veh);
 		bitStream->Read(seat);
-		_MY_log << "s1" << std::endl;
 		if (player == CNetworkConnection::Get()->client->GetMyGUID()) {
-			_MY_log << "s2" << std::endl;
-			_MY_log << CNetworkVehicle::GetByGUID(veh)->GetHandle() << std::endl;
-			CLocalPlayer::Get()->FutureVeh = CNetworkVehicle::GetByGUID(veh);
+			CNetworkVehicle *v = CNetworkVehicle::GetByGUID(veh);
+			if (!v)
+			{
+				log_error << "SetPlayerIntoVehicle: unknown vehicle " << veh.ToString() << std::endl;
+				return;
+			}
+			CLocalPlayer::Get()->FutureVeh = v;
 			CLocalPlayer::Get()->FutureSeat = seat;
 		}
 		else
@@ -259,6 +262,22 @@ namespace FPlayer
 		RakNetGUID veh;
 		bitStream->Read(veh);
 		CNetworkVehicle::Delete(veh);
+	}
+
+	void SetVehiclePos(RakNet::BitStream *bitStream, RakNet::Packet *packet) // RakNetGUID vehicle, CVector3 pos
+	{
+		RakNetGUID guid;
+		CVector3 pos;
+		bitStream->Read(guid);
+		bitStream->Read(pos);
+		CNetworkVehicle *veh = CNetworkVehicle::GetByGUID(guid);
+		if (!veh)
+			return;
+		// our own car moves with us in it; a remote one is teleported
+		if (veh->GetHandle() != 0 && PED::GET_VEHICLE_PED_IS_IN(CLocalPlayer::Get()->GetHandle(), false) == veh->GetHandle())
+			CLocalPlayer::Get()->SetCoordsKeepVehicle(pos.fX, pos.fY, pos.fZ);
+		else
+			veh->Teleport(pos);
 	}
 
 	void CreateMarker(RakNet::BitStream *bitStream, RakNet::Packet *packet)
